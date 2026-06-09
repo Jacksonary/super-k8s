@@ -1,0 +1,33 @@
+[package]
+name = "super-k8s"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "super_k8s_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-single-instance = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-process = "2"
+tauri-plugin-dialog = "2"
+kube = { version = "3", default-features = false, features = ["client", "config", "rustls-tls"] }
+k8s-openapi = { version = "0.27", features = ["latest"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "5"
+parking_lot = "0.12"
+futures = "0.3"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

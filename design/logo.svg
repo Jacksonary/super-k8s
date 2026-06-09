@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="oct" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3d7bf0"/>
+      <stop offset="1" stop-color="#2a5fcf"/>
+    </linearGradient>
+    <linearGradient id="bolt" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd84d"/>
+      <stop offset="1" stop-color="#ffc400"/>
+    </linearGradient>
+    <filter id="ds" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#0b2e6b" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Octagon body -->
+  <polygon
+    points="691.9,77.8 946.2,332.1 946.2,691.9 691.9,946.2 332.1,946.2 77.8,691.9 77.8,332.1 332.1,77.8"
+    fill="url(#oct)" stroke="#1f4aa3" stroke-width="18" stroke-linejoin="round" filter="url(#ds)"/>
+
+  <!-- Kubernetes-style helm wheel (white) -->
+  <g fill="none" stroke="#ffffff" stroke-width="26" stroke-linecap="round">
+    <!-- thin ring -->
+    <circle cx="512" cy="512" r="248" stroke-width="22"/>
+    <!-- 7 spokes from hub edge midpoints to ring -->
+    <line x1="541.1" y1="451.6" x2="619.6" y2="288.6"/>
+    <line x1="577.4" y1="497.1" x2="753.8" y2="456.8"/>
+    <line x1="564.4" y1="553.8" x2="705.9" y2="666.6"/>
+    <line x1="512.0" y1="579.1" x2="512.0" y2="760.0"/>
+    <line x1="459.6" y1="553.8" x2="318.1" y2="666.6"/>
+    <line x1="446.6" y1="497.1" x2="270.2" y2="456.8"/>
+    <line x1="482.9" y1="451.6" x2="404.4" y2="288.6"/>
+  </g>
+
+  <!-- spoke tip dots on the ring -->
+  <g fill="#ffffff">
+    <circle cx="619.6" cy="288.6" r="20"/>
+    <circle cx="753.8" cy="456.8" r="20"/>
+    <circle cx="705.9" cy="666.6" r="20"/>
+    <circle cx="512.0" cy="760.0" r="20"/>
+    <circle cx="318.1" cy="666.6" r="20"/>
+    <circle cx="270.2" cy="456.8" r="20"/>
+    <circle cx="404.4" cy="288.6" r="20"/>
+  </g>
+
+  <!-- Heptagonal hub -->
+  <polygon points="512.0,426.0 579.2,458.4 595.8,531.1 549.3,589.5 474.7,589.5 428.2,531.1 444.8,458.4"
+    fill="#ffffff"/>
+  <!-- blue cut-out inside hub to echo the official mark -->
+  <polygon points="512.0,460.0 555.0,480.7 565.6,527.2 535.9,564.6 488.1,564.6 458.4,527.2 469.0,480.7"
+    fill="url(#oct)"/>
+
+  <!-- Lightning bolt speed badge, bottom-right, overlapping the octagon edge -->
+  <g filter="url(#ds)">
+    <circle cx="838" cy="838" r="150" fill="url(#bolt)" stroke="#ffffff" stroke-width="20"/>
+    <path d="M 862 738 L 776 856 L 832 856 L 814 938 L 902 812 L 844 812 Z"
+      fill="#2a5fcf" stroke="#1f4aa3" stroke-width="6" stroke-linejoin="round"/>
+  </g>
+</svg>
