@@ -1,11 +1,8 @@
-import { useState } from "react";
 import { App, Button, Card, Descriptions, Popconfirm, Space, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { ResourceTarget, KubeObject } from "./ResourceDetailDrawer";
 import { api } from "../../api";
 import { formatAge, formatTimestamp } from "../../utils/format";
-import PodLogsDrawer from "../Pod/PodLogsDrawer";
-import PodExecDrawer from "../Pod/PodExecDrawer";
 import type { PodInfo } from "../../types";
 import { useResizableColumns, ResizableHeaderCell } from "../Common/ResizableColumns";
 import MetadataEditor from "../Common/MetadataEditor";
@@ -62,8 +59,6 @@ interface ConditionRow {
 
 export default function PodOverview({ obj, clusterId, target, reload, onChanged, onOpenBottomPanel }: Props) {
   const { message } = App.useApp();
-  const [logsOpen, setLogsOpen] = useState(false);
-  const [execOpen, setExecOpen] = useState(false);
 
   const meta = obj?.metadata ?? {};
   const spec = obj?.spec ?? {};
@@ -84,18 +79,6 @@ export default function PodOverview({ obj, clusterId, target, reload, onChanged,
   const containerNames: string[] = (Array.isArray(spec.containers) ? spec.containers : [])
     .map((c: any) => c?.name)
     .filter((n: unknown): n is string => typeof n === "string");
-
-  const podForLogs: PodInfo = {
-    name: target.name,
-    namespace: target.namespace ?? "",
-    status: status.phase ?? "",
-    ready: "",
-    restarts: restartTotal,
-    node: spec.nodeName ?? "",
-    pod_ip: status.podIP ?? "",
-    containers: containerNames,
-    age_ms: 0,
-  };
 
   const handleDelete = async () => {
     if (!target.namespace) {
@@ -203,14 +186,14 @@ export default function PodOverview({ obj, clusterId, target, reload, onChanged,
             <Button
               size="small"
               disabled={!target.namespace}
-              onClick={() => onOpenBottomPanel ? onOpenBottomPanel("logs") : setLogsOpen(true)}
+              onClick={() => onOpenBottomPanel?.("logs")}
             >
               Logs
             </Button>
             <Button
               size="small"
               disabled={!target.namespace || containerNames.length === 0}
-              onClick={() => onOpenBottomPanel ? onOpenBottomPanel("terminal") : setExecOpen(true)}
+              onClick={() => onOpenBottomPanel?.("terminal")}
             >
               Terminal
             </Button>
@@ -276,24 +259,6 @@ export default function PodOverview({ obj, clusterId, target, reload, onChanged,
         reload={reload}
         onChanged={onChanged}
       />
-
-      <PodLogsDrawer
-        open={logsOpen}
-        clusterId={clusterId}
-        pod={logsOpen ? podForLogs : null}
-        onClose={() => setLogsOpen(false)}
-      />
-
-      {target.namespace && (
-        <PodExecDrawer
-          open={execOpen}
-          clusterId={clusterId}
-          namespace={target.namespace}
-          pod={target.name}
-          containers={containerNames}
-          onClose={() => setExecOpen(false)}
-        />
-      )}
     </Space>
   );
 }
