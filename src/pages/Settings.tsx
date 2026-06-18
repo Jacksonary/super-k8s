@@ -34,16 +34,6 @@ export default function Settings() {
               <Radio.Button value="light">Light</Radio.Button>
             </Radio.Group>
           </Descriptions.Item>
-          <Descriptions.Item label="Language">
-            <Radio.Group
-              value={config.language === "en" ? "en" : "zh"}
-              disabled={loading}
-              onChange={(e) => handleSave({ language: e.target.value as "zh" | "en" })}
-            >
-              <Radio.Button value="zh">中文</Radio.Button>
-              <Radio.Button value="en">English</Radio.Button>
-            </Radio.Group>
-          </Descriptions.Item>
           <Descriptions.Item label="Default log tail lines">
             <Space>
               <InputNumber

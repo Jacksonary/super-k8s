@@ -1,12 +1,15 @@
 use crate::types::AppConfig;
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
 const APP_DIR: &str = "super-k8s";
 const MANAGED_KUBECONFIG_FILE: &str = "kubeconfig.yaml";
 const APP_CONFIG_FILE: &str = "app.yaml";
+const NAMESPACE_OVERRIDES_FILE: &str = "namespace_overrides.yaml";
 
-const EMPTY_KUBECONFIG: &str = "apiVersion: v1\nkind: Config\nclusters: []\nusers: []\ncontexts: []\n";
+const EMPTY_KUBECONFIG: &str =
+    "apiVersion: v1\nkind: Config\nclusters: []\nusers: []\ncontexts: []\n";
 
 pub fn config_dir() -> Result<PathBuf, String> {
     let base = dirs::config_dir()
@@ -105,5 +108,76 @@ pub fn save_app_config(config: &AppConfig) -> Result<(), String> {
         .map_err(|e| format!("[CONFIG] failed to write tmp {}: {e}", tmp.display()))?;
     fs::rename(&tmp, &path)
         .map_err(|e| format!("[CONFIG] failed to rename tmp -> app.yaml: {e}"))?;
+    Ok(())
+}
+
+// ── Per-cluster namespace overrides ───────────────────────────────────────
+// A cluster (keyed by context name == cluster_id) may carry a user-defined
+// namespace whitelist. When present, the app uses it instead of calling the
+// cluster-scoped `list namespaces` API (which 403s for restricted credentials).
+
+fn namespace_overrides_path() -> Result<PathBuf, String> {
+    Ok(config_dir()?.join(NAMESPACE_OVERRIDES_FILE))
+}
+
+pub fn load_namespace_overrides() -> Result<BTreeMap<String, Vec<String>>, String> {
+    let path = namespace_overrides_path()?;
+    if !path.exists() {
+        return Ok(BTreeMap::new());
+    }
+    let raw = fs::read_to_string(&path)
+        .map_err(|e| format!("[CONFIG] failed to read {}: {e}", path.display()))?;
+    if raw.trim().is_empty() {
+        return Ok(BTreeMap::new());
+    }
+    serde_yaml::from_str::<BTreeMap<String, Vec<String>>>(&raw)
+        .map_err(|e| format!("[CONFIG] failed to parse namespace_overrides.yaml: {e}"))
+}
+
+pub fn save_namespace_overrides(map: &BTreeMap<String, Vec<String>>) -> Result<(), String> {
+    let path = namespace_overrides_path()?;
+    let raw = serde_yaml::to_string(map)
+        .map_err(|e| format!("[CONFIG] failed to serialize namespace overrides: {e}"))?;
+    let tmp = path.with_extension("yaml.tmp");
+    fs::write(&tmp, &raw)
+        .map_err(|e| format!("[CONFIG] failed to write tmp {}: {e}", tmp.display()))?;
+    fs::rename(&tmp, &path)
+        .map_err(|e| format!("[CONFIG] failed to rename tmp -> namespace_overrides.yaml: {e}"))?;
+    Ok(())
+}
+
+/// Read one cluster's namespace whitelist. Returns an empty vec when there is no
+/// override (or on any read/parse error — callers treat empty as "no override").
+pub fn get_namespace_override(cluster_id: &str) -> Vec<String> {
+    load_namespace_overrides()
+        .ok()
+        .and_then(|mut m| m.remove(cluster_id))
+        .unwrap_or_default()
+}
+
+/// Set (or clear) a cluster's namespace whitelist. Input is trimmed, de-duped and
+/// emptied entries dropped; an empty resulting list removes the override entirely.
+pub fn set_namespace_override(cluster_id: &str, namespaces: Vec<String>) -> Result<(), String> {
+    let mut cleaned: Vec<String> = Vec::new();
+    for ns in namespaces {
+        let ns = ns.trim().to_string();
+        if !ns.is_empty() && !cleaned.contains(&ns) {
+            cleaned.push(ns);
+        }
+    }
+    let mut map = load_namespace_overrides()?;
+    if cleaned.is_empty() {
+        map.remove(cluster_id);
+    } else {
+        map.insert(cluster_id.to_string(), cleaned);
+    }
+    save_namespace_overrides(&map)
+}
+
+pub fn remove_namespace_override(cluster_id: &str) -> Result<(), String> {
+    let mut map = load_namespace_overrides()?;
+    if map.remove(cluster_id).is_some() {
+        save_namespace_overrides(&map)?;
+    }
     Ok(())
 }

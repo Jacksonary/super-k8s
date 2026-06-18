@@ -1,21 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Card, Empty, Popconfirm, Space, Tag, Tooltip, Typography, App as AntdApp } from "antd";
-import { CheckCircleFilled, DeleteOutlined, ImportOutlined, ReloadOutlined } from "@ant-design/icons";
+import { CheckCircleFilled, DeleteOutlined, ImportOutlined, PartitionOutlined, ReloadOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import type { ClusterConfig } from "../types";
 import { useClusterStore } from "../store/clusterStore";
 import ImportKubeconfigModal from "../components/Cluster/ImportKubeconfigModal";
+import NamespaceConfigModal from "../components/Cluster/NamespaceConfigModal";
 
 const { Text } = Typography;
 
 export default function Cluster() {
   const { message } = AntdApp.useApp();
   const navigate = useNavigate();
-  const { clusters, refreshClusters, currentClusterId, setCurrentClusterId, addClusterRequestId } =
-    useClusterStore();
+  const {
+    clusters,
+    refreshClusters,
+    currentClusterId,
+    setCurrentClusterId,
+    addClusterRequestId,
+    refreshNamespaces,
+  } = useClusterStore();
   const [importOpen, setImportOpen] = useState(false);
   const [reloading, setReloading] = useState(false);
+  const [nsEditing, setNsEditing] = useState<ClusterConfig | null>(null);
 
   // Auto-open the Import modal when the sidebar "Add Cluster" entry requests it.
   // A ref skips the initial mount value so opening the page never pops the modal.
@@ -121,6 +129,14 @@ export default function Cluster() {
                         </Tag>
                       </Tooltip>
                     )}
+                    <Tooltip title="Configure namespaces">
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<PartitionOutlined />}
+                        onClick={() => setNsEditing(c)}
+                      />
+                    </Tooltip>
                     <Popconfirm
                       title="Remove this cluster?"
                       description="Its context is removed from the managed kubeconfig."
@@ -140,7 +156,7 @@ export default function Cluster() {
                   {c.server}
                 </Text>
 
-                <Space size={4}>
+                <Space size={4} wrap>
                   <Tag style={{ marginInlineEnd: 0 }} color={c.source === "imported" ? "blue" : "default"}>
                     {c.source}
                   </Tag>
@@ -148,6 +164,13 @@ export default function Cluster() {
                     <Tag bordered={false} style={{ marginInlineEnd: 0 }}>
                       ns: {c.namespace}
                     </Tag>
+                  )}
+                  {c.custom_namespaces.length > 0 && (
+                    <Tooltip title={c.custom_namespaces.join(", ")}>
+                      <Tag color="geekblue" style={{ marginInlineEnd: 0 }}>
+                        {c.custom_namespaces.length} ns
+                      </Tag>
+                    </Tooltip>
                   )}
                 </Space>
               </Card>
@@ -161,6 +184,19 @@ export default function Cluster() {
         onClose={() => setImportOpen(false)}
         onSaved={async () => {
           await refreshClusters();
+        }}
+      />
+
+      <NamespaceConfigModal
+        open={nsEditing !== null}
+        cluster={nsEditing}
+        onClose={() => setNsEditing(null)}
+        onSaved={async () => {
+          const editedId = nsEditing?.id;
+          await refreshClusters();
+          if (editedId && editedId === currentClusterId) {
+            await refreshNamespaces();
+          }
         }}
       />
     </Card>

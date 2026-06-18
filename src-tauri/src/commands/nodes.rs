@@ -1,7 +1,10 @@
-use crate::types::NodeInfo;
+use crate::commands::{pods::map_pod, scope};
+use crate::types::{NodeInfo, PodInfo};
 use crate::AppState;
-use k8s_openapi::api::core::v1::Node;
-use kube::{api::ListParams, Api};
+use k8s_openapi::api::core::v1::{Node, Pod};
+use kube::api::{ListParams, Patch, PatchParams};
+use kube::Api;
+use serde_json::{json, Value};
 use tauri::State;
 
 #[tauri::command]
@@ -14,7 +17,7 @@ pub async fn list_nodes(
     let list = api
         .list(&ListParams::default())
         .await
-        .map_err(|e| format!("[KUBE] {e}"))?;
+        .map_err(|e| crate::errors::kube_error("node operation", e))?;
 
     let mut out = Vec::with_capacity(list.items.len());
     for node in list.items {
@@ -81,7 +84,11 @@ pub async fn list_nodes(
 
         out.push(NodeInfo {
             name,
-            status: if ready { "Ready".to_string() } else { "NotReady".to_string() },
+            status: if ready {
+                "Ready".to_string()
+            } else {
+                "NotReady".to_string()
+            },
             roles,
             version,
             os_image,
@@ -94,4 +101,36 @@ pub async fn list_nodes(
     }
 
     Ok(out)
+}
+
+/// Cordon / uncordon a node by patching spec.unschedulable.
+/// on=true -> cordon (unschedulable), on=false -> uncordon.
+#[tauri::command]
+pub async fn cordon_node(
+    state: State<'_, AppState>,
+    cluster_id: String,
+    name: String,
+    on: bool,
+) -> Result<Value, String> {
+    let client = state.pool.get_or_create(&cluster_id).await?;
+    let api: Api<Node> = Api::all(client.clone());
+    let patch = json!({ "spec": { "unschedulable": on } });
+    api.patch(&name, &PatchParams::default(), &Patch::Merge(&patch))
+        .await
+        .map_err(|e| crate::errors::kube_error("node operation", e))?;
+    Ok(json!({ "ok": true }))
+}
+
+/// List the pods scheduled on a given node.
+#[tauri::command]
+pub async fn list_node_pods(
+    state: State<'_, AppState>,
+    cluster_id: String,
+    node_name: String,
+    namespace: Option<String>,
+) -> Result<Vec<PodInfo>, String> {
+    let client = state.pool.get_or_create(&cluster_id).await?;
+    let lp = ListParams::default().fields(&format!("spec.nodeName={node_name}"));
+    let items = scope::list_scoped_with_params::<Pod>(&client, &cluster_id, &namespace, lp).await?;
+    Ok(items.iter().map(map_pod).collect())
 }

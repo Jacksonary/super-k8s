@@ -1,6 +1,5 @@
-// ── 集群（== kubeconfig context）────────────────────────────
 
-/** 存在受管 kubeconfig 中的集群（context）配置 */
+
 export interface ClusterConfig {
   id: string; // context name
   name: string;
@@ -8,9 +7,10 @@ export interface ClusterConfig {
   namespace: string | null;
   user: string;
   source: string; // "default" | "imported"
+  custom_namespaces: string[];
 }
 
-/** 前端展示用（含连接状态） */
+
 export interface ClusterSummary {
   id: string;
   name: string;
@@ -30,7 +30,7 @@ export interface TestConnectionResult {
   latency_ms: number | null;
 }
 
-// ── 概览 ────────────────────────────────────────────────────
+// ── Overview ────────────────────────────────────────────────────
 
 export interface ClusterOverview {
   server_version: string | null;
@@ -104,6 +104,15 @@ export interface ServiceInfo {
   age_ms: number;
 }
 
+
+export interface EndpointInfo {
+  ip: string;
+  node_name: string | null;
+  target_ref: string | null;
+  ports: string[];
+  ready: boolean;
+}
+
 // ── ConfigMap ───────────────────────────────────────────────
 
 export interface ConfigMapInfo {
@@ -125,7 +134,51 @@ export interface EventInfo {
   last_seen_ms: number;
 }
 
-// ── 应用设置 ────────────────────────────────────────────────
+export type ExecEvent =
+  | { kind: "data"; data: string }
+  | { kind: "exit"; message?: string | null };
+
+export type LogEvent =
+  | { kind: "line"; data: string }
+  | { kind: "done" }
+  | { kind: "error"; message: string };
+
+export interface SecretInfo {
+  name: string;
+  namespace: string;
+  secret_type: string;
+  data_keys: string[];
+  age_ms: number;
+}
+
+export interface CronJobInfo {
+  name: string;
+  namespace: string;
+  schedule: string;
+  active: number;
+  last_schedule_ms: number | null;
+  age_ms: number;
+}
+
+export interface JobInfo {
+  name: string;
+  namespace: string;
+  completions: number | null;
+  succeeded: number;
+  failed: number;
+  active: number;
+  complete: boolean;
+  age_ms: number;
+}
+
+export interface IngressInfo {
+  name: string;
+  namespace: string;
+  ingress_class: string | null;
+  hosts: string[];
+  rules_count: number;
+  age_ms: number;
+}
 
 export interface AppConfig {
   theme: "dark" | "light";

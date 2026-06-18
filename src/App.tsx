@@ -51,11 +51,6 @@ function ThemedApp() {
   const isDark = config.theme !== "light";
   const firstRender = useRef(true);
 
-  // 同步 html data-theme，让 index.css 能按属性切换全局样式。
-  // 主题切换瞬间给 <html> 加 .theme-switching class，全站禁用 transition/animation
-  // 一帧。这样可避开 cssinjs 注入新 hash class 与旧 token 残留并存的瞬间，
-  // 否则 antd Radio.Button 的 ::before 等会先用"新 colorPrimary 套到旧选中态"
-  // 渲染一帧，肉眼看到为蓝粗框闪现。
   useLayoutEffect(() => {
     document.documentElement.dataset.theme = isDark ? "dark" : "light";
     if (firstRender.current) {
@@ -64,8 +59,6 @@ function ThemedApp() {
     }
     const root = document.documentElement;
     root.classList.add("theme-switching");
-    // antd cssinjs 异步注入新 token hash 的 <style>，加上 antd 默认 motionDurationMid=200ms
-    // 的过渡，单纯 RAF 不够。用 250ms 兜底覆盖整个切换窗口。
     const timer = window.setTimeout(() => {
       root.classList.remove("theme-switching");
     }, 250);

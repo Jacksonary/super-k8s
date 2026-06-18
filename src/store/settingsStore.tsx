@@ -36,7 +36,6 @@ export function SettingsStoreProvider({ children }: { children: React.ReactNode 
     void (async () => {
       try {
         const cfg = await api.getAppConfig();
-        // 后端权威，但若主题与 localStorage 不一致则同步过来
         try { localStorage.setItem(THEME_LS_KEY, cfg.theme); } catch { /* ignore */ }
         setConfig(cfg);
       } catch {
@@ -50,7 +49,6 @@ export function SettingsStoreProvider({ children }: { children: React.ReactNode 
     setLoading(true);
     try {
       await api.saveAppConfig(next);
-      // theme 同步写 localStorage，下次启动可同步初始化避免 FOUC
       if (patch.theme) {
         try { localStorage.setItem(THEME_LS_KEY, patch.theme); } catch { /* ignore */ }
       }

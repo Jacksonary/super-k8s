@@ -10,6 +10,10 @@ pub struct ClusterConfig {
     pub user: String,
     /// "default" | "imported"
     pub source: String,
+    /// User-defined namespace whitelist for this cluster. Empty = no override
+    /// (auto-list all namespaces). Populated from namespace_overrides.yaml.
+    #[serde(default)]
+    pub custom_namespaces: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -110,6 +114,17 @@ pub struct ConfigMapInfo {
     pub namespace: String,
     pub data_keys: Vec<String>,
     pub age_ms: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct EndpointInfo {
+    pub ip: String,
+    pub node_name: Option<String>,
+    /// "Kind/name"
+    pub target_ref: Option<String>,
+    /// "name:port/proto"
+    pub ports: Vec<String>,
+    pub ready: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

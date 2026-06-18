@@ -15,7 +15,7 @@ import { useClusterStore } from "../store/clusterStore";
 import type { ClusterOverview } from "../types";
 
 export default function Overview() {
-  const { currentClusterId } = useClusterStore();
+  const { currentClusterId, currentNamespace } = useClusterStore();
   const { message } = AntdApp.useApp();
 
   const [overview, setOverview] = useState<ClusterOverview | null>(null);
@@ -25,7 +25,7 @@ export default function Overview() {
     if (!currentClusterId) return;
     setLoading(true);
     try {
-      const data = await api.getOverview(currentClusterId);
+      const data = await api.getOverview(currentClusterId, currentNamespace || null);
       setOverview(data);
     } catch (err) {
       message.error(String(err));
@@ -33,7 +33,7 @@ export default function Overview() {
     } finally {
       setLoading(false);
     }
-  }, [currentClusterId, message]);
+  }, [currentClusterId, currentNamespace, message]);
 
   useEffect(() => {
     void load();

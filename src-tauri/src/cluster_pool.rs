@@ -39,8 +39,7 @@ impl ClusterPool {
 
     pub fn list_clusters(&self) -> Result<Vec<ClusterConfig>, String> {
         let yaml = config::load_managed_yaml()?;
-        let kc = Kubeconfig::from_yaml(&yaml)
-            .map_err(|e| format!("[POOL] failed to parse kubeconfig: {e}"))?;
+        let kc = Kubeconfig::from_yaml(&yaml).map_err(|e| crate::errors::kubeconfig_error(e))?;
 
         let server_by_cluster: HashMap<String, String> = kc
             .clusters
@@ -55,20 +54,19 @@ impl ClusterPool {
             })
             .collect();
 
+        let mut overrides = config::load_namespace_overrides().unwrap_or_default();
+
         let mut out = Vec::new();
         for ctx in &kc.contexts {
             let (cluster_ref, user, namespace) = match &ctx.context {
-                Some(c) => (
-                    c.cluster.clone(),
-                    c.user.clone(),
-                    c.namespace.clone(),
-                ),
+                Some(c) => (c.cluster.clone(), c.user.clone(), c.namespace.clone()),
                 None => (String::new(), None, None),
             };
             let server = server_by_cluster
                 .get(&cluster_ref)
                 .cloned()
                 .unwrap_or_default();
+            let custom_namespaces = overrides.remove(&ctx.name).unwrap_or_default();
             out.push(ClusterConfig {
                 id: ctx.name.clone(),
                 name: ctx.name.clone(),
@@ -76,6 +74,7 @@ impl ClusterPool {
                 namespace,
                 user: user.unwrap_or_default(),
                 source: "default".to_string(),
+                custom_namespaces,
             });
         }
         Ok(out)
@@ -91,8 +90,8 @@ impl ClusterPool {
 
     pub fn delete_cluster(&self, cluster_id: &str) -> Result<(), String> {
         let managed_yaml = config::load_managed_yaml()?;
-        let mut root: Value = serde_yaml::from_str(&managed_yaml)
-            .map_err(|e| format!("[POOL] failed to parse managed kubeconfig: {e}"))?;
+        let mut root: Value =
+            serde_yaml::from_str(&managed_yaml).map_err(|e| crate::errors::kubeconfig_error(e))?;
 
         // Remove the context named cluster_id.
         remove_named(&mut root, "contexts", cluster_id);
@@ -116,8 +115,8 @@ impl ClusterPool {
         retain_named(&mut root, "clusters", &used_clusters);
         retain_named(&mut root, "users", &used_users);
 
-        let serialized = serde_yaml::to_string(&root)
-            .map_err(|e| format!("[POOL] failed to serialize managed kubeconfig: {e}"))?;
+        let serialized =
+            serde_yaml::to_string(&root).map_err(|e| format!("Failed to save kubeconfig: {e}"))?;
         config::save_managed_yaml(&serialized)?;
         self.invalidate(cluster_id);
         Ok(())
@@ -129,7 +128,7 @@ impl ClusterPool {
             return Ok(0);
         }
         let incoming = std::fs::read_to_string(&default_path)
-            .map_err(|e| format!("[POOL] failed to read default kubeconfig: {e}"))?;
+            .map_err(|e| format!("Failed to read default kubeconfig: {e}"))?;
         let (added, ids) = self.merge_yaml(&incoming)?;
         for id in ids {
             self.invalidate(&id);
@@ -141,10 +140,10 @@ impl ClusterPool {
     /// on clash the incoming entry overwrites. Returns (newly added contexts, all affected context ids).
     fn merge_yaml(&self, incoming_yaml: &str) -> Result<(usize, Vec<String>), String> {
         let managed_yaml = config::load_managed_yaml()?;
-        let mut managed: Value = serde_yaml::from_str(&managed_yaml)
-            .map_err(|e| format!("[POOL] failed to parse managed kubeconfig: {e}"))?;
-        let incoming: Value = serde_yaml::from_str(incoming_yaml)
-            .map_err(|e| format!("[POOL] failed to parse incoming kubeconfig: {e}"))?;
+        let mut managed: Value =
+            serde_yaml::from_str(&managed_yaml).map_err(|e| crate::errors::kubeconfig_error(e))?;
+        let incoming: Value =
+            serde_yaml::from_str(incoming_yaml).map_err(|e| crate::errors::kubeconfig_error(e))?;
 
         ensure_mapping(&mut managed)?;
 
@@ -153,7 +152,7 @@ impl ClusterPool {
         let (added, affected) = merge_contexts(&mut managed, &incoming);
 
         let serialized = serde_yaml::to_string(&managed)
-            .map_err(|e| format!("[POOL] failed to serialize managed kubeconfig: {e}"))?;
+            .map_err(|e| format!("Failed to save kubeconfig: {e}"))?;
         config::save_managed_yaml(&serialized)?;
         Ok((added, affected))
     }
@@ -167,7 +166,7 @@ impl Default for ClusterPool {
 
 fn ensure_mapping(root: &mut Value) -> Result<(), String> {
     if !root.is_mapping() {
-        return Err("[POOL] managed kubeconfig is not a YAML mapping".to_string());
+        return Err("Invalid kubeconfig: root must be a YAML object".to_string());
     }
     let map = root.as_mapping_mut().unwrap();
     map.entry(Value::String("apiVersion".to_string()))
@@ -237,8 +236,7 @@ fn merge_contexts(managed: &mut Value, incoming: &Value) -> (usize, Vec<String>)
         }
     };
 
-    let existing_names: HashSet<String> =
-        existing.iter().filter_map(entry_name).collect();
+    let existing_names: HashSet<String> = existing.iter().filter_map(entry_name).collect();
 
     let mut added = 0usize;
     let mut affected = Vec::new();

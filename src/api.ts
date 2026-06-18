@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { Channel } from "@tauri-apps/api/core";
 import type * as T from "./types";
 
 type UnknownRecord = Record<string, unknown>;
@@ -36,7 +37,6 @@ function normalizeAppConfig(cfg: T.AppConfig): T.AppConfig {
 }
 
 export const api = {
-  // ── 集群 ──────────────────────────────────────────────────
   async listClusters() {
     return tauriInvoke<T.ClusterConfig[]>("list_clusters");
   },
@@ -65,9 +65,9 @@ export const api = {
     return tauriInvoke<T.ClusterSummary>("ping_cluster", { clusterId });
   },
 
-  // ── 概览 ──────────────────────────────────────────────────
-  async getOverview(clusterId: string) {
-    return tauriInvoke<T.ClusterOverview>("get_overview", { clusterId });
+  // ── Overview ──────────────────────────────────────────────────
+  async getOverview(clusterId: string, namespace: string | null = null) {
+    return tauriInvoke<T.ClusterOverview>("get_overview", { clusterId, namespace });
   },
 
   // ── Node ──────────────────────────────────────────────────
@@ -78,6 +78,27 @@ export const api = {
   // ── Namespace ─────────────────────────────────────────────
   async listNamespaces(clusterId: string) {
     return tauriInvoke<T.NamespaceInfo[]>("list_namespaces", { clusterId });
+  },
+
+  async setNamespaceOverride(clusterId: string, namespaces: string[]) {
+    return tauriInvoke<{ ok?: boolean; count?: number }>("set_namespace_override", {
+      clusterId,
+      namespaces,
+    });
+  },
+
+  async updateNamespaceMetadata(
+    clusterId: string,
+    name: string,
+    labels: Record<string, string>,
+    annotations: Record<string, string>,
+  ) {
+    return tauriInvoke<{ ok?: boolean }>("update_namespace_metadata", {
+      clusterId,
+      name,
+      labels,
+      annotations,
+    });
   },
 
   // ── Pod ───────────────────────────────────────────────────
@@ -99,7 +120,47 @@ export const api = {
     return tauriInvoke<{ ok?: boolean }>("delete_pod", { clusterId, namespace, pod });
   },
 
-  // ── 工作负载 ──────────────────────────────────────────────
+  async execStart(args: {
+    clusterId: string;
+    namespace: string;
+    pod: string;
+    container: string | null;
+    command: string[] | null;
+    sessionId: string;
+    channel: Channel<T.ExecEvent>;
+  }) {
+    return tauriInvoke<void>("exec_start", args as unknown as UnknownRecord);
+  },
+
+  async execWrite(sessionId: string, data: string) {
+    return tauriInvoke<void>("exec_write", { sessionId, data });
+  },
+
+  async execResize(sessionId: string, cols: number, rows: number) {
+    return tauriInvoke<void>("exec_resize", { sessionId, cols, rows });
+  },
+
+  async execStop(sessionId: string) {
+    return tauriInvoke<void>("exec_stop", { sessionId });
+  },
+
+  async logStreamStart(args: {
+    clusterId: string;
+    namespace: string;
+    pod: string;
+    container: string | null;
+    tailLines: number | null;
+    follow: boolean;
+    sessionId: string;
+    channel: Channel<T.LogEvent>;
+  }) {
+    return tauriInvoke<void>("log_stream_start", args as unknown as UnknownRecord);
+  },
+
+  async logStreamStop(sessionId: string) {
+    return tauriInvoke<void>("log_stream_stop", { sessionId });
+  },
+
   async listDeployments(clusterId: string, namespace: string | null) {
     return tauriInvoke<T.DeploymentInfo[]>("list_deployments", { clusterId, namespace });
   },
@@ -120,12 +181,216 @@ export const api = {
     return tauriInvoke<T.ConfigMapInfo[]>("list_configmaps", { clusterId, namespace });
   },
 
+  async updateResourceMetadata(
+    clusterId: string,
+    apiVersion: string,
+    kind: string,
+    namespace: string | null,
+    name: string,
+    labels: Record<string, string>,
+    annotations: Record<string, string>,
+  ) {
+    return tauriInvoke<void>("update_resource_metadata", {
+      clusterId, apiVersion, kind, namespace, name, labels, annotations,
+    });
+  },
+
+  async updateCronJobSpec(
+    clusterId: string,
+    namespace: string,
+    name: string,
+    schedule: string,
+    suspend: boolean,
+    concurrencyPolicy: string,
+    successfulJobsHistoryLimit: number,
+    failedJobsHistoryLimit: number,
+  ) {
+    return tauriInvoke<void>("update_cronjob_spec", {
+      clusterId, namespace, name, schedule, suspend, concurrencyPolicy,
+      successfulJobsHistoryLimit, failedJobsHistoryLimit,
+    });
+  },
+
+  async updateCronJobMetadata(
+    clusterId: string,
+    namespace: string,
+    name: string,
+    labels: Record<string, string>,
+    annotations: Record<string, string>,
+  ) {
+    return tauriInvoke<void>("update_cronjob_metadata", { clusterId, namespace, name, labels, annotations });
+  },
+
+  async updateSecretData(
+    clusterId: string,
+    namespace: string,
+    name: string,
+    data: Record<string, string>,
+  ) {
+    return tauriInvoke<void>("update_secret_data", { clusterId, namespace, name, data });
+  },
+
+  async updateConfigMapData(
+    clusterId: string,
+    namespace: string,
+    name: string,
+    data: Record<string, string>,
+  ) {
+    return tauriInvoke<void>("update_configmap_data", { clusterId, namespace, name, data });
+  },
+
+  async listSecrets(clusterId: string, namespace: string | null) {
+    return tauriInvoke<T.SecretInfo[]>("list_secrets", { clusterId, namespace });
+  },
+
+  async getSecretValues(clusterId: string, namespace: string, name: string) {
+    return tauriInvoke<Record<string, string>>("get_secret_values", { clusterId, namespace, name });
+  },
+
+  async listCronJobs(clusterId: string, namespace: string | null) {
+    return tauriInvoke<T.CronJobInfo[]>("list_cronjobs", { clusterId, namespace });
+  },
+
+  async listJobs(clusterId: string, namespace: string | null) {
+    return tauriInvoke<T.JobInfo[]>("list_jobs", { clusterId, namespace });
+  },
+
+  async listIngresses(clusterId: string, namespace: string | null) {
+    return tauriInvoke<T.IngressInfo[]>("list_ingresses", { clusterId, namespace });
+  },
+
+  async updateIngressRules(
+    clusterId: string,
+    namespace: string,
+    name: string,
+    rules: unknown,
+  ) {
+    return tauriInvoke<void>("update_ingress_rules", { clusterId, namespace, name, rules });
+  },
+
+  async updateIngressMetadata(
+    clusterId: string,
+    namespace: string,
+    name: string,
+    labels: Record<string, string>,
+    annotations: Record<string, string>,
+  ) {
+    return tauriInvoke<void>("update_ingress_metadata", { clusterId, namespace, name, labels, annotations });
+  },
+
+  async updateDeploymentLabels(
+    clusterId: string,
+    namespace: string,
+    name: string,
+    labels: Record<string, string>,
+  ) {
+    return tauriInvoke<void>("update_deployment_labels", { clusterId, namespace, name, labels });
+  },
+
+  async updateDeploymentImage(
+    clusterId: string,
+    namespace: string,
+    name: string,
+    containerName: string,
+    image: string,
+  ) {
+    return tauriInvoke<void>("update_deployment_image", { clusterId, namespace, name, containerName, image });
+  },
+
+  async updateDeploymentStrategy(
+    clusterId: string,
+    namespace: string,
+    name: string,
+    strategyType: string,
+    maxSurge: string | null,
+    maxUnavailable: string | null,
+  ) {
+    return tauriInvoke<void>("update_deployment_strategy", {
+      clusterId,
+      namespace,
+      name,
+      strategyType,
+      maxSurge,
+      maxUnavailable,
+    });
+  },
+
   // ── Event ─────────────────────────────────────────────────
   async listEvents(clusterId: string, namespace: string | null) {
     return tauriInvoke<T.EventInfo[]>("list_events", { clusterId, namespace });
   },
 
-  // ── 设置 ──────────────────────────────────────────────────
+  async getResourceYaml(
+    clusterId: string,
+    apiVersion: string,
+    kind: string,
+    namespace: string | null,
+    name: string,
+  ) {
+    return tauriInvoke<string>("get_resource_yaml", {
+      clusterId,
+      apiVersion,
+      kind,
+      namespace,
+      name,
+    });
+  },
+
+  async applyResourceYaml(clusterId: string, yaml: string) {
+    return tauriInvoke<{ ok?: boolean; name?: string }>("apply_resource_yaml", {
+      clusterId,
+      yaml,
+    });
+  },
+
+  async getResourceJson(
+    clusterId: string,
+    apiVersion: string,
+    kind: string,
+    namespace: string | null,
+    name: string,
+  ) {
+    return tauriInvoke<Record<string, unknown>>("get_resource_json", {
+      clusterId,
+      apiVersion,
+      kind,
+      namespace,
+      name,
+    });
+  },
+
+  async deleteResource(
+    clusterId: string,
+    apiVersion: string,
+    kind: string,
+    namespace: string | null,
+    name: string,
+  ) {
+    return tauriInvoke<{ ok?: boolean }>("delete_resource", {
+      clusterId,
+      apiVersion,
+      kind,
+      namespace,
+      name,
+    });
+  },
+
+  async cordonNode(clusterId: string, name: string, on: boolean) {
+    return tauriInvoke<{ ok?: boolean }>("cordon_node", { clusterId, name, on });
+  },
+
+  async listNodePods(clusterId: string, nodeName: string, namespace: string | null = null) {
+    return tauriInvoke<T.PodInfo[]>("list_node_pods", { clusterId, nodeName, namespace });
+  },
+
+  async listDeploymentPods(clusterId: string, namespace: string, name: string) {
+    return tauriInvoke<T.PodInfo[]>("list_deployment_pods", { clusterId, namespace, name });
+  },
+
+  async listServiceEndpoints(clusterId: string, namespace: string, name: string) {
+    return tauriInvoke<T.EndpointInfo[]>("list_service_endpoints", { clusterId, namespace, name });
+  },
+
   async getAppConfig() {
     const raw = await tauriInvoke<T.AppConfig>("get_app_config");
     return normalizeAppConfig(raw);

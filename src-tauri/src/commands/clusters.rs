@@ -1,3 +1,4 @@
+use crate::config;
 use crate::types::{ClusterConfig, ClusterSummary, TestConnectionResult};
 use crate::AppState;
 use k8s_openapi::api::core::v1::{Namespace, Node};
@@ -18,9 +19,13 @@ pub async fn import_kubeconfig(state: State<'_, AppState>, yaml: String) -> Resu
 }
 
 #[tauri::command]
-pub async fn delete_cluster(state: State<'_, AppState>, cluster_id: String) -> Result<Value, String> {
+pub async fn delete_cluster(
+    state: State<'_, AppState>,
+    cluster_id: String,
+) -> Result<Value, String> {
     state.pool.delete_cluster(&cluster_id)?;
     state.pool.invalidate(&cluster_id);
+    let _ = crate::config::remove_namespace_override(&cluster_id);
     Ok(json!({ "ok": true }))
 }
 
@@ -69,7 +74,7 @@ pub async fn test_connection(
             success: false,
             server_version: None,
             node_count: None,
-            error_message: Some(format!("[KUBE] {e}")),
+            error_message: Some(crate::errors::kube_error("connect cluster", e)),
             latency_ms: Some(started.elapsed().as_millis() as u64),
         }),
     }
@@ -91,7 +96,10 @@ pub async fn ping_cluster(
     summarize(&state, &cluster_id).await
 }
 
-async fn summarize(state: &State<'_, AppState>, cluster_id: &str) -> Result<ClusterSummary, String> {
+async fn summarize(
+    state: &State<'_, AppState>,
+    cluster_id: &str,
+) -> Result<ClusterSummary, String> {
     let configs = state.pool.list_clusters()?;
     let cfg = configs.into_iter().find(|c| c.id == cluster_id);
     let (name, server) = match cfg {
@@ -118,10 +126,19 @@ async fn summarize(state: &State<'_, AppState>, cluster_id: &str) -> Result<Clus
     match client.apiserver_version().await {
         Ok(info) => {
             let nodes: Api<Node> = Api::all(client.clone());
-            let namespaces: Api<Namespace> = Api::all(client.clone());
             let lp = ListParams::default();
-            let (node_res, ns_res) =
-                futures::join!(nodes.list(&lp), namespaces.list(&lp));
+            let node_res = nodes.list(&lp).await;
+            let namespace_override = config::get_namespace_override(cluster_id);
+            let namespace_count = if namespace_override.is_empty() {
+                let namespaces: Api<Namespace> = Api::all(client.clone());
+                namespaces
+                    .list(&lp)
+                    .await
+                    .map(|l| l.items.len() as i32)
+                    .ok()
+            } else {
+                Some(namespace_override.len() as i32)
+            };
             Ok(ClusterSummary {
                 id: cluster_id.to_string(),
                 name,
@@ -129,7 +146,7 @@ async fn summarize(state: &State<'_, AppState>, cluster_id: &str) -> Result<Clus
                 status: "connected".to_string(),
                 server_version: Some(info.git_version),
                 node_count: node_res.map(|l| l.items.len() as i32).ok(),
-                namespace_count: ns_res.map(|l| l.items.len() as i32).ok(),
+                namespace_count,
                 error_message: None,
             })
         }
@@ -141,7 +158,7 @@ async fn summarize(state: &State<'_, AppState>, cluster_id: &str) -> Result<Clus
             server_version: None,
             node_count: None,
             namespace_count: None,
-            error_message: Some(format!("[KUBE] {e}")),
+            error_message: Some(crate::errors::kube_error("connect cluster", e)),
         }),
     }
 }

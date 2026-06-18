@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import logoUrl from "../../assets/logo.png";
 import { Alert, Button, Layout, Menu, Modal, Progress, Select, Tooltip, Typography, message as antMessage } from "antd";
 import {
-  DashboardOutlined,
   CloudServerOutlined,
   PartitionOutlined,
   AppstoreOutlined,
@@ -17,6 +16,15 @@ import {
   RightOutlined,
   SettingOutlined,
   PlusOutlined,
+  FieldTimeOutlined,
+  LockOutlined,
+  GlobalOutlined,
+  DatabaseOutlined,
+  ShareAltOutlined,
+  ApartmentOutlined,
+  RocketOutlined,
+  ContainerOutlined,
+  ThunderboltOutlined,
 } from "@ant-design/icons";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { relaunch } from "@tauri-apps/plugin-process";
@@ -26,13 +34,16 @@ import { useSettings } from "../../store/settingsStore";
 import { theme } from "antd";
 import { Routes, Route, useLocation, useNavigate, Navigate } from "react-router-dom";
 import { useClusterStore } from "../../store/clusterStore";
-import Overview from "../../pages/Overview";
 import Nodes from "../../pages/Nodes";
 import Namespaces from "../../pages/Namespaces";
 import Pods from "../../pages/Pods";
 import Deployments from "../../pages/Deployments";
 import Services from "../../pages/Services";
 import ConfigMaps from "../../pages/ConfigMaps";
+import Secrets from "../../pages/Secrets";
+import CronJobs from "../../pages/CronJobs";
+import Jobs from "../../pages/Jobs";
+import Ingresses from "../../pages/Ingresses";
 import Events from "../../pages/Events";
 import Cluster from "../../pages/Cluster";
 import ClusterDetail from "../../pages/ClusterDetail";
@@ -42,17 +53,56 @@ const { Sider, Content, Header } = Layout;
 const { Text } = Typography;
 
 const NAV_ITEMS = [
-  { key: "/overview", label: "Overview", icon: <DashboardOutlined /> },
-  { key: "/nodes", label: "Nodes", icon: <CloudServerOutlined /> },
-  { key: "/namespaces", label: "Namespaces", icon: <PartitionOutlined /> },
-  { key: "/pods", label: "Pods", icon: <AppstoreOutlined /> },
-  { key: "/deployments", label: "Deployments", icon: <DeploymentUnitOutlined /> },
-  { key: "/services", label: "Services", icon: <ApiOutlined /> },
-  { key: "/configmaps", label: "ConfigMaps", icon: <FileTextOutlined /> },
-  { key: "/events", label: "Events", icon: <BellOutlined /> },
-  { key: "/cluster", label: "Cluster", icon: <ClusterOutlined /> },
+  {
+    key: "group-cluster",
+    label: "Cluster",
+    icon: <ApartmentOutlined />,
+    children: [
+      { key: "/cluster", label: "Clusters", icon: <ClusterOutlined /> },
+      { key: "/namespaces", label: "Namespaces", icon: <PartitionOutlined /> },
+      { key: "/nodes", label: "Nodes", icon: <CloudServerOutlined /> },
+      { key: "/events", label: "Events", icon: <BellOutlined /> },
+    ],
+  },
+  {
+    key: "group-workloads",
+    label: "Workloads",
+    icon: <RocketOutlined />,
+    children: [
+      { key: "/deployments", label: "Deployments", icon: <DeploymentUnitOutlined /> },
+      { key: "/cronjobs", label: "CronJobs", icon: <FieldTimeOutlined /> },
+      { key: "/pods", label: "Pods", icon: <ContainerOutlined /> },
+      { key: "/jobs", label: "Jobs", icon: <ThunderboltOutlined /> },
+    ],
+  },
+  {
+    key: "group-network",
+    label: "Network",
+    icon: <ShareAltOutlined />,
+    children: [
+      { key: "/services", label: "Services", icon: <ApiOutlined /> },
+      { key: "/ingresses", label: "Ingress", icon: <GlobalOutlined /> },
+    ],
+  },
+  {
+    key: "group-config",
+    label: "Config",
+    icon: <DatabaseOutlined />,
+    children: [
+      { key: "/configmaps", label: "ConfigMaps", icon: <FileTextOutlined /> },
+      { key: "/secrets", label: "Secrets", icon: <LockOutlined /> },
+    ],
+  },
   { key: "/settings", label: "Settings", icon: <SettingOutlined /> },
 ];
+
+// All group keys (for auto-opening when sidebar is expanded)
+const GROUP_KEYS = ["group-cluster", "group-workloads", "group-network", "group-config"];
+
+// Flatten NAV_ITEMS to leaf items only (no groups)
+const NAV_LEAF_ITEMS: { key: string; label: string }[] = NAV_ITEMS.flatMap((item) =>
+  "children" in item && item.children ? item.children : [item],
+);
 
 const SIDEBAR_WIDTH = 240;
 const SIDEBAR_COLLAPSED_WIDTH = 64;
@@ -100,9 +150,10 @@ export default function MainLayout() {
 
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
-      return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
+      const stored = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+      return stored === null ? true : stored === "true";
     } catch {
-      return false;
+      return true;
     }
   });
 
@@ -216,11 +267,17 @@ export default function MainLayout() {
   }, [setUpdateState]);
 
   const selectedKey = useMemo(() => {
-    // Match the longest nav prefix so /cluster/:id still highlights Cluster.
-    const matches = NAV_ITEMS.filter((item) => location.pathname.startsWith(item.key));
+    // Match the longest leaf nav prefix so /cluster/:id still highlights Cluster.
+    const matches = NAV_LEAF_ITEMS.filter((item) => location.pathname.startsWith(item.key));
     matches.sort((a, b) => b.key.length - a.key.length);
-    return matches[0]?.key ?? "/overview";
+    return matches[0]?.key ?? "/cluster";
   }, [location.pathname]);
+
+  // Keep all groups open when sidebar is expanded; collapse to icons when sidebar is collapsed
+  const [openKeys, setOpenKeys] = useState<string[]>(GROUP_KEYS);
+  useEffect(() => {
+    if (!collapsed) setOpenKeys(GROUP_KEYS);
+  }, [collapsed]);
 
   // ── Status color ──
   const statusColor = useMemo(() => {
@@ -328,8 +385,6 @@ export default function MainLayout() {
                       icon={<PlusOutlined />}
                       style={{ textAlign: "left", paddingLeft: 4 }}
                       onClick={() => {
-                        // 先跳到 Cluster 页（保证 Cluster 组件已 mount），再请求弹窗。
-                        // requestAddCluster 通过 store 计数器变化触发 Cluster 页 useEffect 打开 Modal。
                         navigate("/cluster");
                         requestAddCluster();
                       }}
@@ -344,7 +399,6 @@ export default function MainLayout() {
                   style={{
                     fontSize: 13,
                     fontWeight: 500,
-                    color: statusColor,
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
@@ -367,6 +421,20 @@ export default function MainLayout() {
                 { value: "", label: "All namespaces" },
                 ...namespaces.map((ns) => ({ value: ns, label: ns })),
               ]}
+              labelRender={({ label }) => (
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 500,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    display: "block",
+                  }}
+                >
+                  {label}
+                </Text>
+              )}
             />
 
             {/* Error and connecting states shown below the selectors, not inside them */}
@@ -442,8 +510,10 @@ export default function MainLayout() {
           mode="inline"
           theme={isDark ? "dark" : "light"}
           selectedKeys={[selectedKey]}
+          openKeys={collapsed ? [] : openKeys}
+          onOpenChange={setOpenKeys}
           inlineCollapsed={collapsed}
-          onClick={(e) => navigate(e.key)}
+          onClick={(e) => { if (!e.key.startsWith("group-")) navigate(e.key); }}
           style={{ borderRight: 0, flex: 1, overflow: "auto" }}
           items={NAV_ITEMS}
         />
@@ -550,7 +620,7 @@ export default function MainLayout() {
           }}
         >
           <Text strong style={{ fontSize: 14 }}>
-            {NAV_ITEMS.find((i) => i.key === selectedKey)?.label}
+            {NAV_LEAF_ITEMS.find((i) => i.key === selectedKey)?.label}
           </Text>
         </Header>
         {currentSummary?.status === "error" && !connecting && (
@@ -568,19 +638,22 @@ export default function MainLayout() {
         )}
         <Content style={{ padding: 24, background: token.colorBgLayout, overflow: "hidden", display: "flex", flexDirection: "column", minHeight: 0, height: "100%" }}>
           <Routes>
-            <Route index element={<Navigate to="/overview" replace />} />
-            <Route path="/overview" element={<Overview />} />
+            <Route index element={<Navigate to="/cluster" replace />} />
             <Route path="/nodes" element={<Nodes />} />
             <Route path="/namespaces" element={<Namespaces />} />
             <Route path="/pods" element={<Pods />} />
             <Route path="/deployments" element={<Deployments />} />
             <Route path="/services" element={<Services />} />
             <Route path="/configmaps" element={<ConfigMaps />} />
+            <Route path="/secrets" element={<Secrets />} />
+            <Route path="/cronjobs" element={<CronJobs />} />
+            <Route path="/jobs" element={<Jobs />} />
+            <Route path="/ingresses" element={<Ingresses />} />
             <Route path="/events" element={<Events />} />
             <Route path="/cluster" element={<Cluster />} />
             <Route path="/cluster/:id" element={<ClusterDetail />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="*" element={<Navigate to="/overview" replace />} />
+            <Route path="*" element={<Navigate to="/cluster" replace />} />
           </Routes>
         </Content>
       </Layout>

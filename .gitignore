@@ -5,3 +5,5 @@ src-tauri/gen
 *.tmp
 .DS_Store
 .claude-super-k8s-workflow.js
+.claude-detail-workflow.js
+.claude-lens-workflow.js

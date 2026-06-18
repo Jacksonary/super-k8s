@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import { Button, Input, Modal, Space, Typography, App as AntdApp } from "antd";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Alert, Button, Input, Modal, Space, Typography, App as AntdApp } from "antd";
 import { FileAddOutlined } from "@ant-design/icons";
 import { api } from "../../api";
+import { validateYaml } from "../../utils/yamlValidation";
 
 const { Text } = Typography;
 
@@ -15,6 +16,7 @@ export default function ImportKubeconfigModal({ open, onClose, onSaved }: Props)
   const { message } = AntdApp.useApp();
   const [yaml, setYaml] = useState("");
   const [saving, setSaving] = useState(false);
+  const yamlValidation = useMemo(() => validateYaml(yaml), [yaml]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -45,6 +47,10 @@ export default function ImportKubeconfigModal({ open, onClose, onSaved }: Props)
       message.error("Paste a kubeconfig YAML first");
       return;
     }
+    if (!yamlValidation.ok) {
+      message.error(yamlValidation.message ?? "Invalid YAML");
+      return;
+    }
     setSaving(true);
     try {
       const res = await api.importKubeconfig(text);
@@ -71,7 +77,7 @@ export default function ImportKubeconfigModal({ open, onClose, onSaved }: Props)
       footer={
         <Space>
           <Button onClick={onClose}>Cancel</Button>
-          <Button type="primary" loading={saving} onClick={handleSubmit}>
+          <Button type="primary" loading={saving} disabled={!!yaml.trim() && !yamlValidation.ok} onClick={handleSubmit}>
             Import
           </Button>
         </Space>
@@ -93,6 +99,9 @@ export default function ImportKubeconfigModal({ open, onClose, onSaved }: Props)
           style={{ display: "none" }}
           onChange={handleFileChange}
         />
+        {!!yaml.trim() && !yamlValidation.ok && (
+          <Alert type="error" showIcon message={yamlValidation.message ?? "Invalid YAML"} />
+        )}
         <Input.TextArea
           value={yaml}
           onChange={(e) => setYaml(e.target.value)}

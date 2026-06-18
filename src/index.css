@@ -2,10 +2,7 @@ html, body, #root {
   margin: 0;
   padding: 0;
   height: 100%;
-  /* 关掉外层滚动，所有滚动由内部 overflow:auto 容器接管。
-     不加这两条时即使内容塞不满 viewport，wheel/touch 事件也会冒泡到 document
-     触发 page scroll，把整页向上/向下拉露出空白。
-     overscroll-behavior 阻止内层到边界后滚动链式传播到外层（含橡皮筋）。 */
+  
   overflow: hidden;
   overscroll-behavior: none;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
@@ -50,10 +47,36 @@ pre {
   font-family: "SF Mono", Menlo, Consolas, Monaco, "Courier New", monospace;
 }
 
-/* 主题切换瞬间，全站禁用 transition/animation 一帧。
-   避开 antd cssinjs 注入新 token hash class 与旧样式短暂并存导致的色彩闪烁
-   （表现：Radio.Button 等组件 ::before/边框会闪现一帧"新主题色套到旧选中态"的粗框）。
-   class 由 React 在 useLayoutEffect 加，下一帧 RAF 之后移除。 */
+
+.sk-col-resizer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 2;
+  touch-action: none;
+  user-select: none;
+}
+.sk-col-resizer::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  top: 25%;
+  height: 50%;
+  width: 2px;
+  border-radius: 1px;
+  background: transparent;
+  transition: background 0.15s;
+}
+.sk-col-resizer:hover::after,
+.sk-col-resizer:active::after {
+  background: var(--ant-color-primary, #4d8bf0);
+}
+
+
 html.theme-switching,
 html.theme-switching *,
 html.theme-switching *::before,
@@ -63,7 +86,7 @@ html.theme-switching *::after {
   animation-delay: 0s !important;
 }
 
-/* Sider 内部 children 容器继承 flex-column，使 footer 能贴底 */
+
 .ant-layout-sider-children {
   display: flex;
   flex-direction: column;
@@ -71,7 +94,7 @@ html.theme-switching *::after {
   overflow: hidden;
 }
 
-/* 用 Spin 包外层时，需要让 Spin 容器撑满父级 flex 高度 */
+
 .detail-spin,
 .detail-spin > .ant-spin-container {
   flex: 1;
@@ -80,8 +103,7 @@ html.theme-switching *::after {
   flex-direction: column;
 }
 
-/* 让 flex:1 的 Tabs 内部能撑满 + 滚动：
-   .ant-tabs 自己已经 flex column；这里让它的 content-holder 占据剩余高度并不出现内部滚（让里面 Card/Table 自滚） */
+
 .ant-tabs.ant-tabs-top {
   display: flex;
   flex-direction: column;
@@ -100,4 +122,153 @@ html.theme-switching *::after {
   height: 100%;
   display: flex;
   flex-direction: column;
+}
+
+.resource-detail-drawer .ant-drawer-content-wrapper,
+.resource-detail-drawer .ant-drawer-content,
+.resource-detail-drawer .ant-drawer-wrapper-body,
+.resource-detail-drawer .ant-drawer-body {
+  min-height: 0;
+}
+
+.resource-detail-drawer .ant-drawer-wrapper-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.resource-detail-drawer .ant-drawer-body {
+  flex: 1;
+  overflow: hidden;
+}
+
+.resource-detail-tabs {
+  flex: 1;
+  min-height: 0;
+}
+
+.resource-detail-tabs > .ant-tabs-content-holder > .ant-tabs-content > .ant-tabs-tabpane {
+  min-height: 0;
+}
+
+.resource-yaml-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.resource-yaml-toolbar {
+  flex: 0 0 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.resource-yaml-status {
+  min-width: 0;
+}
+
+.resource-yaml-editor-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.resource-yaml-editor-wrap > .ant-input {
+  flex: 1;
+  min-height: 0;
+}
+
+.resource-overview-panel,
+.resource-events-panel {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.resource-yaml-search {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  z-index: 3;
+  min-width: 0;
+  padding: 4px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ant-color-bg-container) 82%, transparent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(4px);
+}
+
+.resource-yaml-search .ant-input-affix-wrapper {
+  width: 130px;
+}
+
+.resource-yaml-highlight {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+  margin: 0;
+  padding: 4px 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, 'JetBrains Mono', Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.5715;
+  color: transparent;
+}
+
+.resource-yaml-highlight mark {
+  color: transparent;
+  background: rgba(250, 219, 20, 0.32);
+  border-radius: 2px;
+}
+
+.resource-yaml-highlight mark.current {
+  background: rgba(250, 140, 22, 0.5);
+}
+
+.resource-yaml-editor-wrap > .ant-input {
+  position: relative;
+  z-index: 1;
+}
+
+.pod-log-output {
+  margin: 0;
+  padding: 12px;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: ui-monospace, 'JetBrains Mono', Menlo, monospace;
+  font-size: 12px;
+  height: calc(100vh - 190px);
+  overflow: auto;
+}
+
+.pod-log-output mark {
+  background: rgba(250, 219, 20, 0.32);
+  color: inherit;
+  border-radius: 2px;
+}
+
+.pod-log-output mark.current {
+  background: rgba(250, 140, 22, 0.55);
+}
+
+/* Fix xterm character measurement on Linux/WebKit where inherited CSS
+   properties can cause the measurement span to report incorrect width.
+   See: https://github.com/xtermjs/xterm.js/issues/5155 */
+.xterm .xterm-width-cache-measure-container,
+.xterm .xterm-char-measure-element {
+  letter-spacing: normal !important;
+  font-variant-ligatures: none !important;
+  word-spacing: normal !important;
+  text-rendering: auto !important;
+  font-kerning: none !important;
 }
