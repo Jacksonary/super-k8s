@@ -94,9 +94,6 @@ const NAV_ITEMS = [
   { key: "/settings", label: "Settings", icon: <SettingOutlined /> },
 ];
 
-// All group keys (for auto-opening when sidebar is expanded)
-const GROUP_KEYS = ["group-cluster", "group-workloads", "group-network", "group-config"];
-
 // Flatten NAV_ITEMS to leaf items only (no groups)
 const NAV_LEAF_ITEMS: { key: string; label: string }[] = NAV_ITEMS.flatMap((item) =>
   "children" in item && item.children ? item.children : [item],
@@ -395,7 +392,6 @@ export default function MainLayout() {
           mode="inline"
           theme={isDark ? "dark" : "light"}
           selectedKeys={[selectedKey]}
-          defaultOpenKeys={GROUP_KEYS}
           onClick={(e) => { if (!e.key.startsWith("group-")) navigate(e.key); }}
           style={{ borderRight: 0, flex: 1, overflow: "auto" }}
           items={NAV_ITEMS}
