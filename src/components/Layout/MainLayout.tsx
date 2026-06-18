@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import logoUrl from "../../assets/logo.png";
 import { Alert, Button, Layout, Menu, Modal, Progress, Select, Tooltip, Typography, message as antMessage } from "antd";
 import {
@@ -12,8 +12,6 @@ import {
   ClusterOutlined,
   GithubOutlined,
   ReloadOutlined,
-  LeftOutlined,
-  RightOutlined,
   SettingOutlined,
   PlusOutlined,
   FieldTimeOutlined,
@@ -105,8 +103,6 @@ const NAV_LEAF_ITEMS: { key: string; label: string }[] = NAV_ITEMS.flatMap((item
 );
 
 const SIDEBAR_WIDTH = 240;
-const SIDEBAR_COLLAPSED_WIDTH = 64;
-const SIDEBAR_COLLAPSED_KEY = "super-k8s:sidebar-collapsed";
 // Set when the user clicks "Later" on a downloaded update; on next launch the app
 // silently re-downloads and installs before showing the UI.
 const PENDING_UPDATE_KEY = "super-k8s:install-update-on-launch";
@@ -140,30 +136,12 @@ export default function MainLayout() {
   const { token } = theme.useToken();
   const { config: appConfig } = useSettings();
   const isDark = appConfig.theme !== "light";
-  const hoverBg = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)";
   const { state: updateState, setState: setUpdateState, checking, recheck } = useUpdateCheck(__APP_VERSION__, appConfig.check_updates_on_startup);
 
   const readyVersionRef = useRef<string>("");
   const pendingUpdateRef = useRef<Update | null>(null);
   const downloadingRef = useRef(false);
   const modalOpenRef = useRef(false);
-
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
-    try {
-      const stored = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
-      return stored === null ? true : stored === "true";
-    } catch {
-      return true;
-    }
-  });
-
-  const toggleCollapsed = useCallback(() => {
-    setCollapsed((c) => {
-      const next = !c;
-      try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next)); } catch { /* ignore */ }
-      return next;
-    });
-  }, []);
 
   function showRestartModal(version: string) {
     if (modalOpenRef.current) return;
@@ -273,27 +251,10 @@ export default function MainLayout() {
     return matches[0]?.key ?? "/cluster";
   }, [location.pathname]);
 
-  // Keep all groups open when sidebar is expanded; collapse to icons when sidebar is collapsed
-  const [openKeys, setOpenKeys] = useState<string[]>(GROUP_KEYS);
-  useEffect(() => {
-    if (!collapsed) setOpenKeys(GROUP_KEYS);
-  }, [collapsed]);
-
-  // ── Status color ──
-  const statusColor = useMemo(() => {
-    if (connecting) return "#faad14";
-    if (currentSummary?.status === "error") return "#ff4d4f";
-    if (currentSummary?.status === "connected") return "#52c41a";
-    return "#8c8c8c";
-  }, [currentSummary?.status, connecting]);
-
   return (
     <Layout style={{ height: "100vh", overflow: "hidden" }}>
       <Sider
         width={SIDEBAR_WIDTH}
-        collapsedWidth={SIDEBAR_COLLAPSED_WIDTH}
-        collapsed={collapsed}
-        trigger={null}
         style={{
           height: "100vh",
           overflow: "hidden",
@@ -307,8 +268,8 @@ export default function MainLayout() {
             height: 56,
             display: "flex",
             alignItems: "center",
-            justifyContent: collapsed ? "center" : "space-between",
-            padding: collapsed ? 0 : "0 12px 0 16px",
+            justifyContent: "space-between",
+            padding: "0 12px 0 16px",
             borderBottom: `1px solid ${token.colorBorder}`,
             flexShrink: 0,
           }}
@@ -319,200 +280,122 @@ export default function MainLayout() {
               alt="logo"
               style={{ width: 32, height: 32, flexShrink: 0, display: "block" }}
             />
-            {!collapsed && (
-              <Text strong style={{ color: token.colorPrimary, fontSize: 16, whiteSpace: "nowrap" }}>
-                Super K8s
-              </Text>
-            )}
+            <Text strong style={{ color: token.colorPrimary, fontSize: 16, whiteSpace: "nowrap" }}>
+              Super K8s
+            </Text>
           </div>
-
-          {!collapsed && (
-            <Tooltip title="Collapse sidebar" placement="right">
-              <div
-                onClick={toggleCollapsed}
-                style={{
-                  width: 24,
-                  height: 24,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: 6,
-                  cursor: "pointer",
-                  color: token.colorTextQuaternary,
-                  flexShrink: 0,
-                  transition: "color 0.15s, background 0.15s",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = token.colorTextSecondary;
-                  e.currentTarget.style.background = hoverBg;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = token.colorTextQuaternary;
-                  e.currentTarget.style.background = "transparent";
-                }}
-              >
-                <LeftOutlined style={{ fontSize: 12 }} />
-              </div>
-            </Tooltip>
-          )}
         </div>
 
         {/* ── Cluster + Namespace selectors ── */}
-        {!collapsed && (
-          <div style={{ padding: 12, borderBottom: `1px solid ${token.colorBorder}`, flexShrink: 0 }}>
-            <Select
-              value={currentClusterId ?? undefined}
-              onChange={(v) => { setCurrentClusterId(v); navigate(selectedKey); }}
-              placeholder="Select a cluster"
-              style={{ width: "100%" }}
-              options={clusters.map((c) => ({ value: c.id, label: c.name }))}
-              notFoundContent={
-                <span style={{ color: token.colorTextTertiary }}>No clusters configured.</span>
-              }
-              dropdownRender={(menu) => (
-                <>
-                  {menu}
-                  <div
-                    style={{
-                      borderTop: `1px solid ${token.colorBorderSecondary}`,
-                      padding: "6px 8px",
+        <div style={{ padding: 12, borderBottom: `1px solid ${token.colorBorder}`, flexShrink: 0 }}>
+          <Select
+            value={currentClusterId ?? undefined}
+            onChange={(v) => { setCurrentClusterId(v); navigate(selectedKey); }}
+            placeholder="Select a cluster"
+            style={{ width: "100%" }}
+            options={clusters.map((c) => ({ value: c.id, label: c.name }))}
+            notFoundContent={
+              <span style={{ color: token.colorTextTertiary }}>No clusters configured.</span>
+            }
+            dropdownRender={(menu) => (
+              <>
+                {menu}
+                <div
+                  style={{
+                    borderTop: `1px solid ${token.colorBorderSecondary}`,
+                    padding: "6px 8px",
+                  }}
+                >
+                  <Button
+                    type="link"
+                    size="small"
+                    block
+                    icon={<PlusOutlined />}
+                    style={{ textAlign: "left", paddingLeft: 4 }}
+                    onClick={() => {
+                      navigate("/cluster");
+                      requestAddCluster();
                     }}
                   >
-                    <Button
-                      type="link"
-                      size="small"
-                      block
-                      icon={<PlusOutlined />}
-                      style={{ textAlign: "left", paddingLeft: 4 }}
-                      onClick={() => {
-                        navigate("/cluster");
-                        requestAddCluster();
-                      }}
-                    >
-                      Add / Import Cluster
-                    </Button>
-                  </div>
-                </>
-              )}
-              labelRender={({ label }) => (
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 500,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    display: "block",
-                  }}
-                >
-                  {label}
-                </Text>
-              )}
-            />
-
-            {/* Namespace filter — "" means All namespaces */}
-            <Select
-              value={currentNamespace}
-              onChange={(v) => setCurrentNamespace(v)}
-              style={{ width: "100%", marginTop: 8 }}
-              showSearch
-              optionFilterProp="label"
-              options={[
-                { value: "", label: "All namespaces" },
-                ...namespaces.map((ns) => ({ value: ns, label: ns })),
-              ]}
-              labelRender={({ label }) => (
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 500,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    display: "block",
-                  }}
-                >
-                  {label}
-                </Text>
-              )}
-            />
-
-            {/* Error and connecting states shown below the selectors, not inside them */}
-            {!connecting && currentSummary?.status === "error" && currentSummary.error_message && (
-              <Tooltip title={currentSummary.error_message}>
-                <Text
-                  style={{
-                    display: "block",
-                    marginTop: 4,
-                    fontSize: 11,
-                    color: "#ff4d4f",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {currentSummary.error_message}
-                </Text>
-              </Tooltip>
+                    Add / Import Cluster
+                  </Button>
+                </div>
+              </>
             )}
-            {connecting && (
-              <Text style={{ display: "block", marginTop: 4, fontSize: 11, color: "#faad14" }}>
-                Connecting...
+            labelRender={({ label }) => (
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: 500,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  display: "block",
+                }}
+              >
+                {label}
               </Text>
             )}
-          </div>
-        )}
+          />
 
-        {/* ── Expand button when collapsed ── */}
-        {collapsed && (
-          <Tooltip title="Expand sidebar" placement="right">
-            <div
-              onClick={toggleCollapsed}
-              style={{
-                position: "relative",
-                height: 40,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                color: token.colorTextQuaternary,
-                borderBottom: `1px solid ${token.colorBorder}`,
-                transition: "color 0.15s, background 0.15s",
-                flexShrink: 0,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = token.colorTextSecondary;
-                e.currentTarget.style.background = "rgba(255,255,255,0.06)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = token.colorTextQuaternary;
-                e.currentTarget.style.background = "transparent";
-              }}
-            >
-              <RightOutlined style={{ fontSize: 12 }} />
-              <div
+          {/* Namespace filter — "" means All namespaces */}
+          <Select
+            value={currentNamespace}
+            onChange={(v) => setCurrentNamespace(v)}
+            style={{ width: "100%", marginTop: 8 }}
+            showSearch
+            optionFilterProp="label"
+            options={[
+              { value: "", label: "All namespaces" },
+              ...namespaces.map((ns) => ({ value: ns, label: ns })),
+            ]}
+            labelRender={({ label }) => (
+              <Text
                 style={{
-                  position: "absolute",
-                  top: 8,
-                  right: 8,
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: statusColor,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  display: "block",
                 }}
-              />
-            </div>
-          </Tooltip>
-        )}
+              >
+                {label}
+              </Text>
+            )}
+          />
 
-        {/* ── Navigation ── */}
+          {/* Error and connecting states shown below the selectors, not inside them */}
+          {!connecting && currentSummary?.status === "error" && currentSummary.error_message && (
+            <Tooltip title={currentSummary.error_message}>
+              <Text
+                style={{
+                  display: "block",
+                  marginTop: 4,
+                  fontSize: 11,
+                  color: "#ff4d4f",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {currentSummary.error_message}
+              </Text>
+            </Tooltip>
+          )}
+          {connecting && (
+            <Text style={{ display: "block", marginTop: 4, fontSize: 11, color: "#faad14" }}>
+              Connecting...
+            </Text>
+          )}
+        </div>
+
+        {/* ── Navigation ─ */}
         <Menu
           mode="inline"
           theme={isDark ? "dark" : "light"}
           selectedKeys={[selectedKey]}
-          openKeys={collapsed ? [] : openKeys}
-          onOpenChange={setOpenKeys}
-          inlineCollapsed={collapsed}
+          defaultOpenKeys={GROUP_KEYS}
           onClick={(e) => { if (!e.key.startsWith("group-")) navigate(e.key); }}
           style={{ borderRight: 0, flex: 1, overflow: "auto" }}
           items={NAV_ITEMS}
@@ -521,66 +404,64 @@ export default function MainLayout() {
         {/* ── Footer: version + links ── */}
         <div
           style={{
-            padding: collapsed ? "8px 0" : "8px 12px",
+            padding: "8px 12px",
             borderTop: `1px solid ${token.colorBorder}`,
             display: "flex",
             alignItems: "center",
-            justifyContent: collapsed ? "center" : "space-between",
+            justifyContent: "space-between",
             gap: 4,
             flexShrink: 0,
             minWidth: 0,
           }}
         >
-          {!collapsed && (
-            <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
-              {updateState.status === "available" ? (
-                <Tooltip title={`${updateState.version} available — click to update`}>
-                  <a href="#" onClick={(e) => { e.preventDefault(); handleUpdate(); }} style={{ cursor: "pointer", textDecoration: "none" }}>
-                    <Text style={{ fontSize: 11, color: token.colorWarningText }} ellipsis>
-                      v{__APP_VERSION__} → {updateState.version}
-                    </Text>
-                  </a>
-                </Tooltip>
-              ) : updateState.status === "downloading" ? (
-                <div>
-                  <Text style={{ fontSize: 11, color: token.colorWarningText }}>
-                    Downloading... {updateState.progress}%
-                  </Text>
-                  <Progress percent={updateState.progress} size="small" showInfo={false} strokeColor={token.colorWarning} />
-                </div>
-              ) : updateState.status === "ready" ? (
-                <a href="#" onClick={(e) => { e.preventDefault(); showRestartModal(readyVersionRef.current); }} style={{ cursor: "pointer", textDecoration: "none" }}>
-                  <Text style={{ fontSize: 11, color: token.colorSuccessText }}>
-                    Update ready — restart
+          <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+            {updateState.status === "available" ? (
+              <Tooltip title={`${updateState.version} available — click to update`}>
+                <a href="#" onClick={(e) => { e.preventDefault(); handleUpdate(); }} style={{ cursor: "pointer", textDecoration: "none" }}>
+                  <Text style={{ fontSize: 11, color: token.colorWarningText }} ellipsis>
+                    v{__APP_VERSION__} → {updateState.version}
                   </Text>
                 </a>
-              ) : updateState.status === "error" ? (
-                <Tooltip title={updateState.message}>
-                  <a href="#" onClick={(e) => { e.preventDefault(); recheck(); }} style={{ cursor: "pointer", textDecoration: "none" }}>
-                    <Text style={{ fontSize: 11, color: token.colorErrorText }}>Update failed — retry</Text>
-                  </a>
+              </Tooltip>
+            ) : updateState.status === "downloading" ? (
+              <div>
+                <Text style={{ fontSize: 11, color: token.colorWarningText }}>
+                  Downloading... {updateState.progress}%
+                </Text>
+                <Progress percent={updateState.progress} size="small" showInfo={false} strokeColor={token.colorWarning} />
+              </div>
+            ) : updateState.status === "ready" ? (
+              <a href="#" onClick={(e) => { e.preventDefault(); showRestartModal(readyVersionRef.current); }} style={{ cursor: "pointer", textDecoration: "none" }}>
+                <Text style={{ fontSize: 11, color: token.colorSuccessText }}>
+                  Update ready — restart
+                </Text>
+              </a>
+            ) : updateState.status === "error" ? (
+              <Tooltip title={updateState.message}>
+                <a href="#" onClick={(e) => { e.preventDefault(); recheck(); }} style={{ cursor: "pointer", textDecoration: "none" }}>
+                  <Text style={{ fontSize: 11, color: token.colorErrorText }}>Update failed — retry</Text>
+                </a>
+              </Tooltip>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <Text style={{ fontSize: 11, color: token.colorTextQuaternary }}>
+                  v{__APP_VERSION__}
+                </Text>
+                <Tooltip title="Check for updates">
+                  <ReloadOutlined
+                    spin={checking}
+                    style={{ fontSize: 11, color: token.colorTextQuaternary, cursor: "pointer" }}
+                    onClick={async () => {
+                      if (checking) return;
+                      const result = await recheck();
+                      if (result === "up-to-date") antMessage.info("Already up to date");
+                      else if (result === "error") antMessage.error("Failed to check for updates");
+                    }}
+                  />
                 </Tooltip>
-              ) : (
-                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <Text style={{ fontSize: 11, color: token.colorTextQuaternary }}>
-                    v{__APP_VERSION__}
-                  </Text>
-                  <Tooltip title="Check for updates">
-                    <ReloadOutlined
-                      spin={checking}
-                      style={{ fontSize: 11, color: token.colorTextQuaternary, cursor: "pointer" }}
-                      onClick={async () => {
-                        if (checking) return;
-                        const result = await recheck();
-                        if (result === "up-to-date") antMessage.info("Already up to date");
-                        else if (result === "error") antMessage.error("Failed to check for updates");
-                      }}
-                    />
-                  </Tooltip>
-                </div>
-              )}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
             <Tooltip title="GitHub">
