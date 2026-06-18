@@ -519,17 +519,18 @@ pub async fn update_deployment_strategy(
             }
         })
     } else {
+        // For Recreate, omit rollingUpdate entirely — including `null` causes
+        // a 422 conflict with the strategy type in Strategic Merge Patch.
         json!({
             "spec": {
                 "strategy": {
-                    "type": strategy_type,
-                    "rollingUpdate": null
+                    "type": strategy_type
                 }
             }
         })
     };
     deployments
-        .patch(&name, &PatchParams::default(), &Patch::Merge(&patch))
+        .patch(&name, &PatchParams::default(), &Patch::Strategic(&patch))
         .await
         .map_err(|e| crate::errors::kube_error("update deployment strategy", e))?;
     Ok(())

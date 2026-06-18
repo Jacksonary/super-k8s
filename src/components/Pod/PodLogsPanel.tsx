@@ -32,6 +32,7 @@ function logMatches(logs: string, query: string): Array<{ start: number; end: nu
 }
 
 const SCROLL_THRESHOLD = 40;
+const MAX_LOG_LINES = 10000;
 
 export default function PodLogsPanel({ clusterId, pod, onClose }: Props) {
   const { message } = AntdApp.useApp();
@@ -109,7 +110,15 @@ export default function PodLogsPanel({ clusterId, pod, onClose }: Props) {
     ch.onmessage = (ev) => {
       if (sessionIdRef.current !== sessionId) return;
       if (ev.kind === "line") {
-        setLogs((prev) => prev + ev.data + "\n");
+        setLogs((prev) => {
+          const next = prev + ev.data + "\n";
+          // Cap log buffer to prevent OOM in long-running follow mode
+          if (next.length > MAX_LOG_LINES * 200) {
+            const lines = next.split("\n");
+            return lines.slice(lines.length - MAX_LOG_LINES).join("\n");
+          }
+          return next;
+        });
       } else if (ev.kind === "done") {
         if (sessionIdRef.current === sessionId) sessionIdRef.current = null;
         setConnecting(false);

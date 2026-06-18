@@ -111,7 +111,7 @@ pub async fn apply_resource_yaml(
     let namespace = obj.metadata.namespace.clone();
 
     let api = dynamic_api(&client, &ar, namespace.as_deref());
-    let params = PatchParams::apply("super-k8s").force();
+    let params = PatchParams::apply("super-k8s");
     api.patch(&name, &params, &Patch::Apply(&obj))
         .await
         .map_err(|e| crate::errors::kube_error("resource operation", e))?;

@@ -45,18 +45,23 @@ export function SettingsStoreProvider({ children }: { children: React.ReactNode 
   }, []);
 
   const save = useCallback(async (patch: Partial<AppConfig>) => {
-    const next = { ...config, ...patch };
     setLoading(true);
     try {
-      await api.saveAppConfig(next);
+      // Use functional setConfig to always merge with the latest config,
+      // avoiding stale closure when save is called rapidly.
+      let next: AppConfig;
+      setConfig((prev) => {
+        next = { ...prev, ...patch };
+        return next;
+      });
+      await api.saveAppConfig(next!);
       if (patch.theme) {
         try { localStorage.setItem(THEME_LS_KEY, patch.theme); } catch { /* ignore */ }
       }
-      setConfig(next);
     } finally {
       setLoading(false);
     }
-  }, [config]);
+  }, []);
 
   return (
     <SettingsStoreContext.Provider value={{ config, loading, save }}>

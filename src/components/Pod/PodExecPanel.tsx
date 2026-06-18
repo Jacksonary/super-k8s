@@ -165,8 +165,7 @@ export default function PodExecPanel({ clusterId, namespace, pod, containers, on
   useEffect(() => {
     if (!termRef.current) return;
     void startSession();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [container]);
+  }, [container, startSession]);
 
   // Tab becomes visible → re-fit so xterm fills the container
   useEffect(() => {
