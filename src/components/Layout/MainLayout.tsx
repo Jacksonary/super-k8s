@@ -273,7 +273,6 @@ export default function MainLayout() {
     return matches[0]?.key ?? "/cluster";
   }, [location.pathname]);
 
-  // Keep all groups open when sidebar is expanded; collapse to icons when sidebar is collapsed
   const [openKeys, setOpenKeys] = useState<string[]>([]);
 
   // ── Status color ──
