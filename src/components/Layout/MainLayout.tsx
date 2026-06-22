@@ -133,7 +133,7 @@ export default function MainLayout() {
   const { token } = theme.useToken();
   const { config: appConfig } = useSettings();
   const isDark = appConfig.theme !== "light";
-  const { state: updateState, setState: setUpdateState, checking, recheck } = useUpdateCheck(__APP_VERSION__, appConfig.check_updates_on_startup);
+  const { state: updateState, setState: setUpdateState, fallback, checking, recheck } = useUpdateCheck(__APP_VERSION__, appConfig.check_updates_on_startup);
 
   const readyVersionRef = useRef<string>("");
   const pendingUpdateRef = useRef<Update | null>(null);
@@ -443,6 +443,14 @@ export default function MainLayout() {
                 <Tooltip title={updateState.message}>
                   <a href="#" onClick={(e) => { e.preventDefault(); recheck(); }} style={{ cursor: "pointer", textDecoration: "none" }}>
                     <Text style={{ fontSize: 11, color: token.colorErrorText }}>Update failed — retry</Text>
+                  </a>
+                </Tooltip>
+              ) : fallback ? (
+                <Tooltip title={`v${fallback.latestVersion} available — click to open release`}>
+                  <a href="#" onClick={(e) => { e.preventDefault(); openUrl(fallback.releaseUrl); }} style={{ cursor: "pointer", textDecoration: "none" }}>
+                    <Text style={{ fontSize: 11, color: token.colorWarningText }} ellipsis>
+                      v{__APP_VERSION__} → v{fallback.latestVersion}
+                    </Text>
                   </a>
                 </Tooltip>
               ) : (

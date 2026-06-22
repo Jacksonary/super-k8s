@@ -11,3 +11,4 @@ pub mod scope;
 pub mod settings;
 pub mod workloads;
 pub mod yaml;
+pub mod update;

@@ -102,6 +102,7 @@ pub fn run() {
             commands::logs::log_stream_start,
             commands::logs::log_stream_stop,
             commands::metadata::update_resource_metadata,
+            commands::update::check_update,
         ])
         .run(context)
         .expect("error while running tauri application");
