@@ -274,10 +274,7 @@ export default function MainLayout() {
   }, [location.pathname]);
 
   // Keep all groups open when sidebar is expanded; collapse to icons when sidebar is collapsed
-  const [openKeys, setOpenKeys] = useState<string[]>(GROUP_KEYS);
-  useEffect(() => {
-    if (!collapsed) setOpenKeys(GROUP_KEYS);
-  }, [collapsed]);
+  const [openKeys, setOpenKeys] = useState<string[]>([]);
 
   // ── Status color ──
   const statusColor = useMemo(() => {
