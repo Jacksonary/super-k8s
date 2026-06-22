@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import logoUrl from "../../assets/logo.png";
 import { Alert, Button, Layout, Menu, Modal, Progress, Select, Tooltip, Typography, message as antMessage } from "antd";
 import {
@@ -12,8 +12,6 @@ import {
   ClusterOutlined,
   GithubOutlined,
   ReloadOutlined,
-  LeftOutlined,
-  RightOutlined,
   SettingOutlined,
   PlusOutlined,
   FieldTimeOutlined,
@@ -96,17 +94,12 @@ const NAV_ITEMS = [
   { key: "/settings", label: "Settings", icon: <SettingOutlined /> },
 ];
 
-// All group keys (for auto-opening when sidebar is expanded)
-const GROUP_KEYS = ["group-cluster", "group-workloads", "group-network", "group-config"];
-
 // Flatten NAV_ITEMS to leaf items only (no groups)
 const NAV_LEAF_ITEMS: { key: string; label: string }[] = NAV_ITEMS.flatMap((item) =>
   "children" in item && item.children ? item.children : [item],
 );
 
 const SIDEBAR_WIDTH = 240;
-const SIDEBAR_COLLAPSED_WIDTH = 64;
-const SIDEBAR_COLLAPSED_KEY = "super-k8s:sidebar-collapsed";
 // Set when the user clicks "Later" on a downloaded update; on next launch the app
 // silently re-downloads and installs before showing the UI.
 const PENDING_UPDATE_KEY = "super-k8s:install-update-on-launch";
@@ -140,7 +133,6 @@ export default function MainLayout() {
   const { token } = theme.useToken();
   const { config: appConfig } = useSettings();
   const isDark = appConfig.theme !== "light";
-  const hoverBg = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)";
   const { state: updateState, setState: setUpdateState, checking, recheck } = useUpdateCheck(__APP_VERSION__, appConfig.check_updates_on_startup);
 
   const readyVersionRef = useRef<string>("");
@@ -148,22 +140,6 @@ export default function MainLayout() {
   const downloadingRef = useRef(false);
   const modalOpenRef = useRef(false);
 
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
-    try {
-      const stored = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
-      return stored === null ? true : stored === "true";
-    } catch {
-      return true;
-    }
-  });
-
-  const toggleCollapsed = useCallback(() => {
-    setCollapsed((c) => {
-      const next = !c;
-      try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next)); } catch { /* ignore */ }
-      return next;
-    });
-  }, []);
 
   function showRestartModal(version: string) {
     if (modalOpenRef.current) return;
@@ -275,21 +251,10 @@ export default function MainLayout() {
 
   const [openKeys, setOpenKeys] = useState<string[]>([]);
 
-  // ── Status color ──
-  const statusColor = useMemo(() => {
-    if (connecting) return "#faad14";
-    if (currentSummary?.status === "error") return "#ff4d4f";
-    if (currentSummary?.status === "connected") return "#52c41a";
-    return "#8c8c8c";
-  }, [currentSummary?.status, connecting]);
-
   return (
     <Layout style={{ height: "100vh", overflow: "hidden" }}>
       <Sider
         width={SIDEBAR_WIDTH}
-        collapsedWidth={SIDEBAR_COLLAPSED_WIDTH}
-        collapsed={collapsed}
-        trigger={null}
         style={{
           height: "100vh",
           overflow: "hidden",
@@ -303,8 +268,8 @@ export default function MainLayout() {
             height: 56,
             display: "flex",
             alignItems: "center",
-            justifyContent: collapsed ? "center" : "space-between",
-            padding: collapsed ? 0 : "0 12px 0 16px",
+            justifyContent: "space-between",
+            padding: "0 12px 0 16px",
             borderBottom: `1px solid ${token.colorBorder}`,
             flexShrink: 0,
           }}
@@ -315,46 +280,15 @@ export default function MainLayout() {
               alt="logo"
               style={{ width: 32, height: 32, flexShrink: 0, display: "block" }}
             />
-            {!collapsed && (
-              <Text strong style={{ color: token.colorPrimary, fontSize: 16, whiteSpace: "nowrap" }}>
+            <Text strong style={{ color: token.colorPrimary, fontSize: 16, whiteSpace: "nowrap" }}>
                 Super K8s
               </Text>
-            )}
           </div>
 
-          {!collapsed && (
-            <Tooltip title="Collapse sidebar" placement="right">
-              <div
-                onClick={toggleCollapsed}
-                style={{
-                  width: 24,
-                  height: 24,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: 6,
-                  cursor: "pointer",
-                  color: token.colorTextQuaternary,
-                  flexShrink: 0,
-                  transition: "color 0.15s, background 0.15s",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = token.colorTextSecondary;
-                  e.currentTarget.style.background = hoverBg;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = token.colorTextQuaternary;
-                  e.currentTarget.style.background = "transparent";
-                }}
-              >
-                <LeftOutlined style={{ fontSize: 12 }} />
-              </div>
-            </Tooltip>
-          )}
+
         </div>
 
         {/* ── Cluster + Namespace selectors ── */}
-        {!collapsed && (
           <div style={{ padding: 12, borderBottom: `1px solid ${token.colorBorder}`, flexShrink: 0 }}>
             <Select
               value={currentClusterId ?? undefined}
@@ -457,58 +391,14 @@ export default function MainLayout() {
               </Text>
             )}
           </div>
-        )}
-
-        {/* ── Expand button when collapsed ── */}
-        {collapsed && (
-          <Tooltip title="Expand sidebar" placement="right">
-            <div
-              onClick={toggleCollapsed}
-              style={{
-                position: "relative",
-                height: 40,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                color: token.colorTextQuaternary,
-                borderBottom: `1px solid ${token.colorBorder}`,
-                transition: "color 0.15s, background 0.15s",
-                flexShrink: 0,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = token.colorTextSecondary;
-                e.currentTarget.style.background = "rgba(255,255,255,0.06)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = token.colorTextQuaternary;
-                e.currentTarget.style.background = "transparent";
-              }}
-            >
-              <RightOutlined style={{ fontSize: 12 }} />
-              <div
-                style={{
-                  position: "absolute",
-                  top: 8,
-                  right: 8,
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: statusColor,
-                }}
-              />
-            </div>
-          </Tooltip>
-        )}
 
         {/* ── Navigation ── */}
         <Menu
           mode="inline"
           theme={isDark ? "dark" : "light"}
           selectedKeys={[selectedKey]}
-          openKeys={collapsed ? [] : openKeys}
+          openKeys={openKeys}
           onOpenChange={setOpenKeys}
-          inlineCollapsed={collapsed}
           onClick={(e) => { if (!e.key.startsWith("group-")) navigate(e.key); }}
           style={{ borderRight: 0, flex: 1, overflow: "auto" }}
           items={NAV_ITEMS}
@@ -517,18 +407,17 @@ export default function MainLayout() {
         {/* ── Footer: version + links ── */}
         <div
           style={{
-            padding: collapsed ? "8px 0" : "8px 12px",
+            padding: "8px 12px",
             borderTop: `1px solid ${token.colorBorder}`,
             display: "flex",
             alignItems: "center",
-            justifyContent: collapsed ? "center" : "space-between",
+            justifyContent: "space-between",
             gap: 4,
             flexShrink: 0,
             minWidth: 0,
           }}
         >
-          {!collapsed && (
-            <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+          <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
               {updateState.status === "available" ? (
                 <Tooltip title={`${updateState.version} available — click to update`}>
                   <a href="#" onClick={(e) => { e.preventDefault(); handleUpdate(); }} style={{ cursor: "pointer", textDecoration: "none" }}>
@@ -575,8 +464,7 @@ export default function MainLayout() {
                   </Tooltip>
                 </div>
               )}
-            </div>
-          )}
+          </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
             <Tooltip title="GitHub">
