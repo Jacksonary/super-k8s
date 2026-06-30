@@ -143,6 +143,17 @@ export type LogEvent =
   | { kind: "done" }
   | { kind: "error"; message: string };
 
+export type FileDownloadEvent =
+  | { kind: "fileSize"; total: number }
+  | { kind: "progress"; totalBytes: number }
+  | { kind: "complete"; totalBytes: number }
+  | { kind: "error"; message: string };
+
+export interface FileEntry {
+  name: string;
+  isDir: boolean;
+}
+
 export interface SecretInfo {
   name: string;
   namespace: string;

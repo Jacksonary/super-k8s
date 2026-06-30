@@ -1,4 +1,5 @@
 pub mod clusters;
+pub mod download;
 pub mod events;
 pub mod exec;
 pub mod logs;

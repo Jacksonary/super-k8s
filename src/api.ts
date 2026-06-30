@@ -161,6 +161,34 @@ export const api = {
     return tauriInvoke<void>("log_stream_stop", { sessionId });
   },
 
+  async fileDownloadStart(args: {
+    clusterId: string;
+    namespace: string;
+    pod: string;
+    container: string | null;
+    sourcePath: string;
+    isDirectory: boolean;
+    savePath: string;
+    sessionId: string;
+    channel: Channel<T.FileDownloadEvent>;
+  }) {
+    return tauriInvoke<void>("file_download_start", args as unknown as UnknownRecord);
+  },
+
+  async fileDownloadStop(sessionId: string) {
+    return tauriInvoke<void>("file_download_stop", { sessionId });
+  },
+
+  async listPodFiles(
+    clusterId: string,
+    namespace: string,
+    pod: string,
+    container: string | null,
+    path: string,
+  ) {
+    return tauriInvoke<T.FileEntry[]>("list_pod_files", { clusterId, namespace, pod, container, path });
+  },
+
   async listDeployments(clusterId: string, namespace: string | null) {
     return tauriInvoke<T.DeploymentInfo[]>("list_deployments", { clusterId, namespace });
   },

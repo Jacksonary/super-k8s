@@ -49,6 +49,7 @@ pub fn run() {
         })
         .manage(commands::exec::ExecSessions::default())
         .manage(commands::logs::LogSessions::default())
+        .manage(commands::download::DownloadSessions::default())
         .invoke_handler(tauri::generate_handler![
             commands::clusters::list_clusters,
             commands::clusters::import_kubeconfig,
@@ -101,6 +102,9 @@ pub fn run() {
             commands::exec::exec_stop,
             commands::logs::log_stream_start,
             commands::logs::log_stream_stop,
+            commands::download::file_download_start,
+            commands::download::file_download_stop,
+            commands::download::list_pod_files,
             commands::metadata::update_resource_metadata,
             commands::update::check_update,
         ])

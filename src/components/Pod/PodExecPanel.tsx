@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Select, Space, Typography, theme, App as AntdApp } from "antd";
-import { ReloadOutlined } from "@ant-design/icons";
+import { DownloadOutlined, ReloadOutlined } from "@ant-design/icons";
 import { Channel } from "@tauri-apps/api/core";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { api } from "../../api";
 import type { ExecEvent } from "../../types";
+import PodDownloadModal from "./PodDownloadModal";
 
 const { Text } = Typography;
 
@@ -40,6 +41,68 @@ export default function PodExecPanel({ clusterId, namespace, pod, containers, on
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const sessionRef = useRef<string | null>(null);
+
+  // Track the working directory inside the terminal
+  const cwdRef = useRef<string>("/");
+
+  // Download modal state
+  const [downloadModalOpen, setDownloadModalOpen] = useState(false);
+
+  // Callback used to intercept user input for cd tracking
+  const sendTerminalData = useCallback((d: string) => {
+    const sid = sessionRef.current;
+    if (sid) void api.execWrite(sid, d).catch(() => undefined);
+
+    // Track `cd` commands to maintain cwd state
+    // Handle patterns: cd /path, cd  /path, cd path, cd -
+    const cdMatch = d.match(/cd\s+(.+?)(;|\||\n|&&|\|\||\r|$)/s);
+    if (cdMatch) {
+      let target = cdMatch[1].trim();
+      // Handle quoted paths
+      target = target.replace(/^["']|["']$/g, "");
+      if (target.startsWith("/")) {
+        cwdRef.current = target;
+      } else if (target === "~") {
+        cwdRef.current = "/root";
+      } else if (target.startsWith("~/")) {
+        cwdRef.current = "/root/" + target.slice(2);
+      } else if (target !== ".." && target !== ".") {
+        // Relative path
+        const base = cwdRef.current.endsWith("/") ? cwdRef.current : cwdRef.current + "/";
+        cwdRef.current = base + target;
+      } else if (target === "..") {
+        const parts = cwdRef.current.split("/").filter(Boolean);
+        parts.pop();
+        cwdRef.current = "/" + parts.join("/");
+        if (cwdRef.current === "") cwdRef.current = "/";
+      }
+    }
+  }, []);
+
+  // Extract cwd from the terminal prompt (last few lines)
+  const extractCwdFromBuffer = useCallback((term: Terminal): string | null => {
+    const buffer = term.buffer.active;
+    if (!buffer) return null;
+
+    // Scan the last 10 lines for a prompt pattern
+    for (let i = Math.max(0, buffer.cursorY - 1); i >= Math.max(0, buffer.cursorY - 10); i--) {
+      const line = buffer.getLine(i)?.translateToString(true);
+      if (!line) continue;
+
+      // Match common shell prompt patterns:
+      // user@host:/path$  user@host:/path#  /path$  /path#
+      // Handles paths like: /app, /app/sub, /, /root, etc.
+      const match = line.match(/:([/][^\s$#]*?)[\s]*[$#]\s*$/);
+      if (match) {
+        const extracted = match[1];
+        if (extracted && extracted !== cwdRef.current) {
+          cwdRef.current = extracted;
+        }
+        return extracted;
+      }
+    }
+    return null;
+  }, []);
 
   const stopSession = useCallback(() => {
     const sid = sessionRef.current;
@@ -118,8 +181,10 @@ export default function PodExecPanel({ clusterId, namespace, pod, containers, on
     fitRef.current = fit;
 
     const dataDisp = term.onData((d) => {
-      const sid = sessionRef.current;
-      if (sid) void api.execWrite(sid, d).catch(() => undefined);
+      sendTerminalData(d);
+
+      // Periodically extract cwd from terminal buffer
+      extractCwdFromBuffer(term);
     });
 
     const doFit = () => {
@@ -206,6 +271,13 @@ export default function PodExecPanel({ clusterId, namespace, pod, containers, on
               options={containers.map((c) => ({ value: c, label: c }))}
             />
           )}
+          <Button
+            size="small"
+            icon={<DownloadOutlined />}
+            onClick={() => setDownloadModalOpen(true)}
+          >
+            Download
+          </Button>
           <Button size="small" icon={<ReloadOutlined />} onClick={() => void startSession()}>
             Reconnect
           </Button>
@@ -220,6 +292,16 @@ export default function PodExecPanel({ clusterId, namespace, pod, containers, on
           minHeight: 0,
           background: TERM_THEME.background,
         }}
+      />
+
+      <PodDownloadModal
+        clusterId={clusterId}
+        namespace={namespace}
+        pod={pod}
+        container={container}
+        cwd={cwdRef.current}
+        open={downloadModalOpen}
+        onCancel={() => setDownloadModalOpen(false)}
       />
     </div>
   );
