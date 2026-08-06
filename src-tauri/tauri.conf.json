@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "super-k8s",
+  "productName": "Super K8S",
   "version": "0.0.0",
   "identifier": "com.jacksonary.super-k8s",
   "build": {

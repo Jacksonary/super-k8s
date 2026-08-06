@@ -1,4 +1,4 @@
-# Super K8s
+# Super K8S
 
 一款跨平台的桌面 Kubernetes 集群管理工具，基于 Tauri 2（Rust 后端）+ React 18 + TypeScript + Ant Design 5 构建。可以把它看作轻量版的 Lens / Rancher Desktop。
 
