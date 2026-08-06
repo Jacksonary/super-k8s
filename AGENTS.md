@@ -1,6 +1,6 @@
 # Agent Instructions
 
-Super K8s is a Tauri 2 desktop Kubernetes manager with a Rust backend and a React 18 + TypeScript + Ant Design 5 frontend. Use the product docs as the source of truth for user-facing behavior: [README.md](README.md) and [README.zh-CN.md](README.zh-CN.md).
+Super K8S is a Tauri 2 desktop Kubernetes manager with a Rust backend and a React 18 + TypeScript + Ant Design 5 frontend. Use the product docs as the source of truth for user-facing behavior: [README.md](README.md) and [README.zh-CN.md](README.zh-CN.md).
 
 ## Commands
 
