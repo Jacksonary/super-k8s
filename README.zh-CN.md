@@ -16,6 +16,24 @@
 - **配置字典（ConfigMaps）** —— 浏览键与数据。
 - **事件（Events）** —— 类型、原因、消息、关联对象。
 
+## 下载安装
+
+前往 [GitHub Releases](https://github.com/Jacksonary/super-k8s/releases) 页面下载对应平台的安装包：
+
+| 平台 | 格式 |
+|---|---|
+| Windows 64-bit | `.exe` (NSIS) / `.msi` |
+| Linux | `.deb` / `.rpm` / `.AppImage` |
+| macOS（仅 Apple Silicon） | `.dmg` |
+
+> Linux AppImage 无需安装，赋予执行权限后直接运行：
+> `chmod +x Super\ K8s_*.AppImage && ./Super\ K8s_*.AppImage`
+
+> **macOS**：目前仅提供 Apple Silicon（M 系列）版本，不支持 Intel Mac。由于应用未经代码签名和公证，首次打开时 Gatekeeper 会提示"已损坏"。在终端执行以下命令移除隔离属性即可：
+> ```bash
+> xattr -cr "/Applications/Super K8S.app"
+> ```
+
 ## 开发
 
 ```bash

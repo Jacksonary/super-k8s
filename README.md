@@ -16,6 +16,24 @@ English | [简体中文](./README.zh-CN.md)
 - **ConfigMaps** — browse keys and data.
 - **Events** — type, reason, message, involved object.
 
+## Download
+
+Head to [GitHub Releases](https://github.com/Jacksonary/super-k8s/releases) to grab the installer for your platform:
+
+| Platform | Format |
+|---|---|
+| Windows 64-bit | `.exe` (NSIS) / `.msi` |
+| Linux | `.deb` / `.rpm` / `.AppImage` |
+| macOS (Apple Silicon only) | `.dmg` |
+
+> For Linux AppImage, no installation is required — just make it executable and run:
+> `chmod +x Super\ K8s_*.AppImage && ./Super\ K8s_*.AppImage`
+
+> **macOS**: only Apple Silicon (M-series) Macs are supported; Intel Macs are not built. The app isn't code-signed/notarized, so Gatekeeper will report it as "damaged" on first launch. Remove the quarantine attribute to fix it:
+> ```bash
+> xattr -cr "/Applications/Super K8S.app"
+> ```
+
 ## Development
 
 ```bash
