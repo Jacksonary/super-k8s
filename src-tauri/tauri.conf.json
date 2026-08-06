@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Super K8s",
+        "title": "Super K8S",
         "width": 1400,
         "height": 900,
         "minWidth": 1000,
