@@ -281,7 +281,7 @@ export default function MainLayout() {
               style={{ width: 32, height: 32, flexShrink: 0, display: "block" }}
             />
             <Text strong style={{ color: token.colorPrimary, fontSize: 16, whiteSpace: "nowrap" }}>
-                Super K8s
+                Super K8S
               </Text>
           </div>
 
