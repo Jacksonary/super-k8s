@@ -137,7 +137,7 @@ export default function Cluster() {
     const oldIndex = clusters.findIndex((c) => c.id === active.id);
     const newIndex = clusters.findIndex((c) => c.id === over.id);
     const reordered = arrayMove(clusters, oldIndex, newIndex);
-    await saveOrder(reordered.map((c) => c.id));
+    await saveOrder(reordered.map((c: ClusterConfig) => c.id));
     await refreshClusters();
   }
 
