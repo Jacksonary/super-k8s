@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import logoUrl from "../../assets/logo.png";
-import { Alert, Button, Layout, Menu, Modal, Progress, Select, Tooltip, Typography, message as antMessage } from "antd";
+import { Alert, Button, Dropdown, Layout, Menu, Modal, Progress, Tooltip, Typography, message as antMessage } from "antd";
 import {
   CloudServerOutlined,
   PartitionOutlined,
@@ -23,6 +23,7 @@ import {
   RocketOutlined,
   ContainerOutlined,
   ThunderboltOutlined,
+  DownOutlined,
 } from "@ant-design/icons";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { relaunch } from "@tauri-apps/plugin-process";
@@ -251,6 +252,56 @@ export default function MainLayout() {
 
   const [openKeys, setOpenKeys] = useState<string[]>([]);
 
+  const hoverBg = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)";
+
+  const statusColor = useMemo(() => {
+    if (connecting) return "#faad14";
+    if (currentSummary?.status === "error") return "#ff4d4f";
+    if (currentSummary?.status === "connected") return "#52c41a";
+    return "#8c8c8c";
+  }, [currentSummary?.status, connecting]);
+
+  const [clusterDropdownOpen, setClusterDropdownOpen] = useState(false);
+  const [namespaceDropdownOpen, setNamespaceDropdownOpen] = useState(false);
+
+  const currentCluster = useMemo(
+    () => clusters.find((c) => c.id === currentClusterId) ?? null,
+    [clusters, currentClusterId],
+  );
+
+  const clusterDropdownItems = useMemo(() => [
+    ...clusters.map((c) => ({ key: c.id, label: c.name })),
+    { type: "divider" as const },
+    {
+      key: "__add",
+      label: (
+        <span style={{ color: token.colorPrimary }}>
+          <PlusOutlined style={{ marginRight: 6 }} />
+          Add / Import Cluster
+        </span>
+      ),
+    },
+  ], [clusters, token.colorPrimary]);
+
+  const handleClusterMenuClick = useCallback(({ key }: { key: string }) => {
+    if (key === "__add") {
+      navigate("/cluster");
+      requestAddCluster();
+      return;
+    }
+    setCurrentClusterId(key);
+    navigate(selectedKey);
+  }, [setCurrentClusterId, navigate, selectedKey, requestAddCluster]);
+
+  const namespaceDropdownItems = useMemo(() => [
+    { key: "", label: "All namespaces" },
+    ...namespaces.map((ns) => ({ key: ns, label: ns })),
+  ], [namespaces]);
+
+  const handleNamespaceMenuClick = useCallback(({ key }: { key: string }) => {
+    setCurrentNamespace(key);
+  }, [setCurrentNamespace]);
+
   return (
     <Layout style={{ height: "100vh", overflow: "hidden" }}>
       <Sider
@@ -289,91 +340,76 @@ export default function MainLayout() {
         </div>
 
         {/* ── Cluster + Namespace selectors ── */}
-          <div style={{ padding: 12, borderBottom: `1px solid ${token.colorBorder}`, flexShrink: 0 }}>
-            <Select
-              value={currentClusterId ?? undefined}
-              onChange={(v) => { setCurrentClusterId(v); navigate(selectedKey); }}
-              placeholder="Select a cluster"
-              style={{ width: "100%" }}
-              options={clusters.map((c) => ({ value: c.id, label: c.name }))}
-              notFoundContent={
-                <span style={{ color: token.colorTextTertiary }}>No clusters configured.</span>
-              }
-              dropdownRender={(menu) => (
-                <>
-                  {menu}
-                  <div
-                    style={{
-                      borderTop: `1px solid ${token.colorBorderSecondary}`,
-                      padding: "6px 8px",
-                    }}
-                  >
-                    <Button
-                      type="link"
-                      size="small"
-                      block
-                      icon={<PlusOutlined />}
-                      style={{ textAlign: "left", paddingLeft: 4 }}
-                      onClick={() => {
-                        navigate("/cluster");
-                        requestAddCluster();
-                      }}
-                    >
-                      Add / Import Cluster
-                    </Button>
-                  </div>
-                </>
-              )}
-              labelRender={({ label }) => (
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 500,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    display: "block",
-                  }}
-                >
-                  {label}
-                </Text>
-              )}
-            />
+          <div style={{ padding: 8, borderBottom: `1px solid ${token.colorBorder}`, flexShrink: 0 }}>
+            <Dropdown
+              menu={{ items: clusterDropdownItems, onClick: handleClusterMenuClick, selectedKeys: currentClusterId ? [currentClusterId] : [] }}
+              trigger={["click"]}
+              open={clusterDropdownOpen}
+              onOpenChange={setClusterDropdownOpen}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "6px 10px",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  transition: "background 0.15s",
+                  userSelect: "none",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = hoverBg; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden" }}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: statusColor, flexShrink: 0 }} />
+                  <Text style={{ fontSize: 13, fontWeight: 500, color: token.colorText, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {currentCluster?.name ?? "Select a cluster"}
+                  </Text>
+                </div>
+                <DownOutlined style={{ fontSize: 10, color: token.colorTextQuaternary, flexShrink: 0, transition: "transform 0.2s", transform: clusterDropdownOpen ? "rotate(180deg)" : "rotate(0deg)" }} />
+              </div>
+            </Dropdown>
 
-            {/* Namespace filter — "" means All namespaces */}
-            <Select
-              value={currentNamespace}
-              onChange={(v) => setCurrentNamespace(v)}
-              style={{ width: "100%", marginTop: 8 }}
-              showSearch
-              optionFilterProp="label"
-              options={[
-                { value: "", label: "All namespaces" },
-                ...namespaces.map((ns) => ({ value: ns, label: ns })),
-              ]}
-              labelRender={({ label }) => (
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 500,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    display: "block",
-                  }}
-                >
-                  {label}
-                </Text>
-              )}
-            />
+            <Dropdown
+              menu={{ items: namespaceDropdownItems, onClick: handleNamespaceMenuClick, selectedKeys: [currentNamespace] }}
+              trigger={["click"]}
+              open={namespaceDropdownOpen}
+              onOpenChange={setNamespaceDropdownOpen}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "6px 10px",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  transition: "background 0.15s",
+                  userSelect: "none",
+                  marginTop: 2,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = hoverBg; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden" }}>
+                  <PartitionOutlined style={{ fontSize: 12, color: token.colorTextQuaternary, flexShrink: 0 }} />
+                  <Text style={{ fontSize: 13, fontWeight: 500, color: token.colorText, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {currentNamespace || "All namespaces"}
+                  </Text>
+                </div>
+                <DownOutlined style={{ fontSize: 10, color: token.colorTextQuaternary, flexShrink: 0, transition: "transform 0.2s", transform: namespaceDropdownOpen ? "rotate(180deg)" : "rotate(0deg)" }} />
+              </div>
+            </Dropdown>
 
-            {/* Error and connecting states shown below the selectors, not inside them */}
+            {/* Error and connecting states shown below the selectors */}
             {!connecting && currentSummary?.status === "error" && currentSummary.error_message && (
               <Tooltip title={currentSummary.error_message}>
                 <Text
                   style={{
                     display: "block",
-                    marginTop: 4,
+                    marginTop: 2,
+                    paddingLeft: 10,
                     fontSize: 11,
                     color: "#ff4d4f",
                     overflow: "hidden",
@@ -386,7 +422,7 @@ export default function MainLayout() {
               </Tooltip>
             )}
             {connecting && (
-              <Text style={{ display: "block", marginTop: 4, fontSize: 11, color: "#faad14" }}>
+              <Text style={{ display: "block", marginTop: 2, paddingLeft: 10, fontSize: 11, color: "#faad14" }}>
                 Connecting...
               </Text>
             )}
