@@ -54,6 +54,7 @@ pub fn run() {
             commands::clusters::list_clusters,
             commands::clusters::import_kubeconfig,
             commands::clusters::delete_cluster,
+            commands::clusters::reorder_clusters,
             commands::clusters::reload_default_kubeconfig,
             commands::clusters::test_connection,
             commands::clusters::get_cluster_summary,

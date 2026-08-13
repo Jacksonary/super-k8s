@@ -1,14 +1,109 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, Card, Empty, Popconfirm, Space, Tag, Tooltip, Typography, App as AntdApp } from "antd";
-import { CheckCircleFilled, DeleteOutlined, ImportOutlined, PartitionOutlined, ReloadOutlined } from "@ant-design/icons";
+import { DeleteOutlined, ImportOutlined, LinkOutlined, DisconnectOutlined, PartitionOutlined, ReloadOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { SortableContext, arrayMove, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { api } from "../api";
 import type { ClusterConfig } from "../types";
 import { useClusterStore } from "../store/clusterStore";
+import { useClusterOrder } from "../hooks/useClusterOrder";
 import ImportKubeconfigModal from "../components/Cluster/ImportKubeconfigModal";
 import NamespaceConfigModal from "../components/Cluster/NamespaceConfigModal";
 
 const { Text } = Typography;
+
+interface SortableCardProps {
+  c: ClusterConfig;
+  active: boolean;
+  onNavigate: (id: string) => void;
+  onSetActive: (id: string) => void;
+  onNsEdit: (c: ClusterConfig) => void;
+  onDelete: (id: string) => void;
+}
+
+function SortableClusterCard({ c, active, onNavigate, onSetActive, onNsEdit, onDelete }: SortableCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: c.id });
+
+  return (
+    <Card
+      ref={setNodeRef}
+      hoverable
+      size="small"
+      styles={{ body: { padding: 12, cursor: isDragging ? "grabbing" : "grab" } }}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+      }}
+      {...attributes}
+      {...listeners}
+      onClick={() => onNavigate(c.id)}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 6 }}>
+        <Text strong ellipsis style={{ minWidth: 0, flex: 1 }}>
+          {c.name}
+        </Text>
+        <Space size={2} onClick={(e) => e.stopPropagation()}>
+          {active ? (
+            <Tooltip title="Active">
+              <Button type="text" size="small" icon={<LinkOutlined style={{ color: "#52c41a" }} />} />
+            </Tooltip>
+          ) : (
+            <Tooltip title="Set as active">
+              <Button type="text" size="small" icon={<DisconnectOutlined />} onClick={() => onSetActive(c.id)} />
+            </Tooltip>
+          )}
+          <Tooltip title="Configure namespaces">
+            <Button type="text" size="small" icon={<PartitionOutlined />} onClick={() => onNsEdit(c)} />
+          </Tooltip>
+          <Popconfirm
+            title="Remove this cluster?"
+            description="Its context is removed from the managed kubeconfig."
+            onConfirm={() => onDelete(c.id)}
+            okButtonProps={{ danger: true }}
+          >
+            <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+          </Popconfirm>
+        </Space>
+      </div>
+
+      <Text
+        code
+        ellipsis={{ tooltip: c.server }}
+        style={{ fontSize: 12, display: "block", marginBottom: 6 }}
+      >
+        {c.server}
+      </Text>
+
+      <Space size={4} wrap>
+        <Tag style={{ marginInlineEnd: 0 }} color={c.source === "imported" ? "blue" : "default"}>
+          {c.source}
+        </Tag>
+        {c.namespace && (
+          <Tag bordered={false} style={{ marginInlineEnd: 0 }}>
+            ns: {c.namespace}
+          </Tag>
+        )}
+        {c.custom_namespaces.length > 0 && (
+          <Tooltip title={c.custom_namespaces.join(", ")}>
+            <Tag color="geekblue" style={{ marginInlineEnd: 0 }}>
+              {c.custom_namespaces.length} ns
+            </Tag>
+          </Tooltip>
+        )}
+      </Space>
+    </Card>
+  );
+}
 
 export default function Cluster() {
   const { message } = AntdApp.useApp();
@@ -21,12 +116,17 @@ export default function Cluster() {
     addClusterRequestId,
     refreshNamespaces,
   } = useClusterStore();
+  const { saveOrder } = useClusterOrder();
   const [importOpen, setImportOpen] = useState(false);
   const [reloading, setReloading] = useState(false);
   const [nsEditing, setNsEditing] = useState<ClusterConfig | null>(null);
+  const [localClusters, setLocalClusters] = useState<ClusterConfig[]>(clusters);
 
-  // Auto-open the Import modal when the sidebar "Add Cluster" entry requests it.
-  // A ref skips the initial mount value so opening the page never pops the modal.
+  // Keep localClusters in sync with store (after refresh)
+  useEffect(() => {
+    setLocalClusters(clusters);
+  }, [clusters]);
+
   const lastSeenAddRequest = useRef(addClusterRequestId);
   useEffect(() => {
     if (addClusterRequestId === lastSeenAddRequest.current) return;
@@ -34,10 +134,18 @@ export default function Cluster() {
     setImportOpen(true);
   }, [addClusterRequestId]);
 
-  const sortedClusters = useMemo(
-    () => [...clusters].sort((a, b) => a.name.localeCompare(b.name)),
-    [clusters],
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
+
+  async function handleDragEnd({ active, over }: DragEndEvent) {
+    if (!over || active.id === over.id) return;
+    const oldIndex = localClusters.findIndex((c) => c.id === active.id);
+    const newIndex = localClusters.findIndex((c) => c.id === over.id);
+    const reordered = arrayMove(localClusters, oldIndex, newIndex);
+    setLocalClusters(reordered);
+    await saveOrder(reordered.map((c) => c.id));
+  }
 
   async function handleDelete(id: string) {
     try {
@@ -81,102 +189,32 @@ export default function Cluster() {
         </Space>
       }
     >
-      {clusters.length === 0 ? (
+      {localClusters.length === 0 ? (
         <Empty description="No clusters. Import a kubeconfig or reload ~/.kube/config." />
       ) : (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-            gap: 12,
-          }}
-        >
-          {sortedClusters.map((c: ClusterConfig) => {
-            const active = c.id === currentClusterId;
-            return (
-              <Card
-                key={c.id}
-                hoverable
-                size="small"
-                styles={{ body: { padding: 12, cursor: "pointer" } }}
-                onClick={() => navigate(`/cluster/${encodeURIComponent(c.id)}`)}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: 8,
-                    marginBottom: 6,
-                  }}
-                >
-                  <Text strong ellipsis style={{ minWidth: 0, flex: 1 }}>
-                    {c.name}
-                  </Text>
-                  <Space size={2} onClick={(e) => e.stopPropagation()}>
-                    {active ? (
-                      <Tag icon={<CheckCircleFilled />} color="success" style={{ marginInlineEnd: 0 }}>
-                        Active
-                      </Tag>
-                    ) : (
-                      <Tooltip title="Switch to this cluster">
-                        <Tag
-                          color="default"
-                          style={{ marginInlineEnd: 0, cursor: "pointer" }}
-                          onClick={() => setCurrentClusterId(c.id)}
-                        >
-                          Set active
-                        </Tag>
-                      </Tooltip>
-                    )}
-                    <Tooltip title="Configure namespaces">
-                      <Button
-                        type="text"
-                        size="small"
-                        icon={<PartitionOutlined />}
-                        onClick={() => setNsEditing(c)}
-                      />
-                    </Tooltip>
-                    <Popconfirm
-                      title="Remove this cluster?"
-                      description="Its context is removed from the managed kubeconfig."
-                      onConfirm={() => handleDelete(c.id)}
-                      okButtonProps={{ danger: true }}
-                    >
-                      <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-                    </Popconfirm>
-                  </Space>
-                </div>
-
-                <Text
-                  code
-                  ellipsis={{ tooltip: c.server }}
-                  style={{ fontSize: 12, display: "block", marginBottom: 6 }}
-                >
-                  {c.server}
-                </Text>
-
-                <Space size={4} wrap>
-                  <Tag style={{ marginInlineEnd: 0 }} color={c.source === "imported" ? "blue" : "default"}>
-                    {c.source}
-                  </Tag>
-                  {c.namespace && (
-                    <Tag bordered={false} style={{ marginInlineEnd: 0 }}>
-                      ns: {c.namespace}
-                    </Tag>
-                  )}
-                  {c.custom_namespaces.length > 0 && (
-                    <Tooltip title={c.custom_namespaces.join(", ")}>
-                      <Tag color="geekblue" style={{ marginInlineEnd: 0 }}>
-                        {c.custom_namespaces.length} ns
-                      </Tag>
-                    </Tooltip>
-                  )}
-                </Space>
-              </Card>
-            );
-          })}
-        </div>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={localClusters.map((c) => c.id)} strategy={rectSortingStrategy}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+                gap: 12,
+              }}
+            >
+              {localClusters.map((c) => (
+                <SortableClusterCard
+                  key={c.id}
+                  c={c}
+                  active={c.id === currentClusterId}
+                  onNavigate={(id) => navigate(`/cluster/${encodeURIComponent(id)}`)}
+                  onSetActive={setCurrentClusterId}
+                  onNsEdit={setNsEditing}
+                  onDelete={handleDelete}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
 
       <ImportKubeconfigModal

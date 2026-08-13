@@ -7,6 +7,7 @@ const APP_DIR: &str = "super-k8s";
 const MANAGED_KUBECONFIG_FILE: &str = "kubeconfig.yaml";
 const APP_CONFIG_FILE: &str = "app.yaml";
 const NAMESPACE_OVERRIDES_FILE: &str = "namespace_overrides.yaml";
+const SORT_ORDER_FILE: &str = "sort_order.yaml";
 
 const EMPTY_KUBECONFIG: &str =
     "apiVersion: v1\nkind: Config\nclusters: []\nusers: []\ncontexts: []\n";
@@ -179,5 +180,39 @@ pub fn remove_namespace_override(cluster_id: &str) -> Result<(), String> {
     if map.remove(cluster_id).is_some() {
         save_namespace_overrides(&map)?;
     }
+    Ok(())
+}
+
+// ── Cluster sort order ────────────────────────────────────────────────────
+// Stores { cluster_id -> sort_order } independently from kubeconfig so we
+// never touch the kubeconfig format.
+
+fn sort_order_path() -> Result<PathBuf, String> {
+    Ok(config_dir()?.join(SORT_ORDER_FILE))
+}
+
+pub fn load_sort_order() -> Result<BTreeMap<String, u64>, String> {
+    let path = sort_order_path()?;
+    if !path.exists() {
+        return Ok(BTreeMap::new());
+    }
+    let raw = fs::read_to_string(&path)
+        .map_err(|e| format!("[CONFIG] failed to read sort_order.yaml: {e}"))?;
+    if raw.trim().is_empty() {
+        return Ok(BTreeMap::new());
+    }
+    serde_yaml::from_str::<BTreeMap<String, u64>>(&raw)
+        .map_err(|e| format!("[CONFIG] failed to parse sort_order.yaml: {e}"))
+}
+
+pub fn save_sort_order(map: &BTreeMap<String, u64>) -> Result<(), String> {
+    let path = sort_order_path()?;
+    let raw = serde_yaml::to_string(map)
+        .map_err(|e| format!("[CONFIG] failed to serialize sort order: {e}"))?;
+    let tmp = path.with_extension("yaml.tmp");
+    fs::write(&tmp, &raw)
+        .map_err(|e| format!("[CONFIG] failed to write tmp {}: {e}", tmp.display()))?;
+    fs::rename(&tmp, &path)
+        .map_err(|e| format!("[CONFIG] failed to rename tmp -> sort_order.yaml: {e}"))?;
     Ok(())
 }

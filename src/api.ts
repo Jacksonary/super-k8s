@@ -49,6 +49,10 @@ export const api = {
     return tauriInvoke<{ ok?: boolean }>("delete_cluster", { clusterId });
   },
 
+  async reorderClusters(ids: string[]) {
+    return tauriInvoke<{ ok?: boolean }>("reorder_clusters", { ids });
+  },
+
   async reloadDefaultKubeconfig() {
     return tauriInvoke<{ ok?: boolean; added?: number }>("reload_default_kubeconfig");
   },

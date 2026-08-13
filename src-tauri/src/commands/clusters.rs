@@ -4,12 +4,23 @@ use crate::AppState;
 use k8s_openapi::api::core::v1::{Namespace, Node};
 use kube::{api::ListParams, Api};
 use serde_json::{json, Value};
+use std::collections::BTreeMap;
 use std::time::Instant;
 use tauri::State;
 
 #[tauri::command]
 pub async fn list_clusters(state: State<'_, AppState>) -> Result<Vec<ClusterConfig>, String> {
-    state.pool.list_clusters()
+    let mut clusters = state.pool.list_clusters()?;
+    let order = config::load_sort_order().unwrap_or_default();
+    clusters.sort_by(|a, b| {
+        let oa = order.get(&a.id).copied().unwrap_or(0);
+        let ob = order.get(&b.id).copied().unwrap_or(0);
+        if oa != 0 && ob != 0 { return oa.cmp(&ob); }
+        if oa != 0 { return std::cmp::Ordering::Less; }
+        if ob != 0 { return std::cmp::Ordering::Greater; }
+        a.name.cmp(&b.name)
+    });
+    Ok(clusters)
 }
 
 #[tauri::command]
@@ -26,6 +37,19 @@ pub async fn delete_cluster(
     state.pool.delete_cluster(&cluster_id)?;
     state.pool.invalidate(&cluster_id);
     let _ = crate::config::remove_namespace_override(&cluster_id);
+    let mut order = config::load_sort_order().unwrap_or_default();
+    order.remove(&cluster_id);
+    let _ = config::save_sort_order(&order);
+    Ok(json!({ "ok": true }))
+}
+
+#[tauri::command]
+pub async fn reorder_clusters(ids: Vec<String>) -> Result<Value, String> {
+    let mut order = BTreeMap::new();
+    for (i, id) in ids.iter().enumerate() {
+        order.insert(id.clone(), (i + 1) as u64);
+    }
+    config::save_sort_order(&order)?;
     Ok(json!({ "ok": true }))
 }
 
