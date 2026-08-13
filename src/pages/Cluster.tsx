@@ -120,12 +120,6 @@ export default function Cluster() {
   const [importOpen, setImportOpen] = useState(false);
   const [reloading, setReloading] = useState(false);
   const [nsEditing, setNsEditing] = useState<ClusterConfig | null>(null);
-  const [localClusters, setLocalClusters] = useState<ClusterConfig[]>(clusters);
-
-  // Keep localClusters in sync with store (after refresh)
-  useEffect(() => {
-    setLocalClusters(clusters);
-  }, [clusters]);
 
   const lastSeenAddRequest = useRef(addClusterRequestId);
   useEffect(() => {
@@ -140,11 +134,11 @@ export default function Cluster() {
 
   async function handleDragEnd({ active, over }: DragEndEvent) {
     if (!over || active.id === over.id) return;
-    const oldIndex = localClusters.findIndex((c) => c.id === active.id);
-    const newIndex = localClusters.findIndex((c) => c.id === over.id);
-    const reordered = arrayMove(localClusters, oldIndex, newIndex);
-    setLocalClusters(reordered);
+    const oldIndex = clusters.findIndex((c) => c.id === active.id);
+    const newIndex = clusters.findIndex((c) => c.id === over.id);
+    const reordered = arrayMove(clusters, oldIndex, newIndex);
     await saveOrder(reordered.map((c) => c.id));
+    await refreshClusters();
   }
 
   async function handleDelete(id: string) {
@@ -189,11 +183,11 @@ export default function Cluster() {
         </Space>
       }
     >
-      {localClusters.length === 0 ? (
+      {clusters.length === 0 ? (
         <Empty description="No clusters. Import a kubeconfig or reload ~/.kube/config." />
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={localClusters.map((c) => c.id)} strategy={rectSortingStrategy}>
+          <SortableContext items={clusters.map((c) => c.id)} strategy={rectSortingStrategy}>
             <div
               style={{
                 display: "grid",
@@ -201,7 +195,7 @@ export default function Cluster() {
                 gap: 12,
               }}
             >
-              {localClusters.map((c) => (
+              {clusters.map((c) => (
                 <SortableClusterCard
                   key={c.id}
                   c={c}
