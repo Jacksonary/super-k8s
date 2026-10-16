@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./src-tauri/icons/icon.png" width="96" height="96" alt="Super K8S Logo" />
+</p>
+
 # Super K8S
 
 A cross-platform desktop Kubernetes cluster manager built with Tauri 2 (Rust backend) and React 18 + TypeScript + Ant Design 5. Think of it as a lightweight Lens / Rancher Desktop alternative.
